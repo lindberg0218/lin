@@ -1,0 +1,3702 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>合肥东站列尾作业大表 v2.5 - 工业级优化版</title>
+    <!-- !! console垫片：必须在所有JS之前执行。工控机Chromium/CEF部分方法可能缺失 !! -->
+    <script>
+    (function () {
+        if (typeof console === 'undefined') { window.console = {}; }
+        var _noop = function () {};
+        var _e = typeof console.error === 'function' ? console.error.bind(console) : _noop;
+        var _w = typeof console.warn  === 'function' ? console.warn.bind(console)  : _e;
+        ['log','info','debug','group','groupEnd','groupCollapsed','time','timeEnd','table','trace']
+            .forEach(function (m) {
+                if (typeof console[m] !== 'function') {
+                    console[m] = (m === 'info' || m === 'log') ? _w : _noop;
+                }
+            });
+    })();
+    </script>
+<style>
+    /* ==================== CSS样式部分 ==================== */
+
+    /* 1. 字体变量与全局设置 */
+    :root {
+        --brand-primary: #3182ce;
+        --text-primary: #2d3748;
+        --text-secondary: #718096;
+        --danger-color: #e53e3e;
+        --success-color: #38a169;
+        --border-color: #cbd5e0;
+        --row-height: 1.8em;
+        --header-bg: #2d3748;
+        --warning-bg: #fffde7;
+        --bg-input-focus: #fffaf0;
+        /* [Electron Refactor] 强制使用系统UI字体，工控机无网络环境 */
+        --font-standard: system-ui, "Microsoft YaHei", "微软雅黑", sans-serif;
+        /* [FIX CSS-A] 提取重复SVG箭头为CSS变量，消除3处重复定义 */
+        --select-arrow-blue: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%232c5282%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
+        --select-arrow-white: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font-standard); -webkit-font-smoothing: antialiased; }
+
+    body, input, textarea, select, button {
+        font-family: var(--font-standard) !important;
+        font-size: 14px;
+        line-height: 1.4;
+    }
+
+    /* [Electron Refactor] 防误触：禁止正文区域文本选中 */
+    body { background: #f7fafc; padding: 5px; height: 100vh; overflow: hidden; user-select: none; -webkit-user-select: none; }
+    /* [Electron Refactor] 输入框保持可选中 */
+    input, textarea, select { user-select: text; -webkit-user-select: text; }
+
+    /* 2. 布局容器 */
+    .container {
+        max-width: 100%; height: 98vh; background: white;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        display: flex; flex-direction: column; border-radius: 4px; overflow: hidden;
+    }
+
+    .top-nav {
+        display: grid; grid-template-columns: 1.2fr 1fr 1.2fr;
+        align-items: center; background: #2d3748; color: white;
+        padding: 0 20px; height: 65px; flex-shrink: 0;
+        border-bottom: 3px solid var(--brand-primary);
+    }
+    .top-nav.history-mode { background: #742a2a !important; border-bottom-color: #feb2b2; }
+
+    .nav-center h1 { font-size: 30px; letter-spacing: 2px; font-weight: 800; text-align: center; }
+    .nav-left { display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: bold; }
+    .nav-right { display: flex; justify-content: flex-end; gap: 8px; align-items: center; flex-wrap: nowrap; }
+
+    .clock-box {
+        font-family: 'Consolas', monospace;
+        background: rgba(0,0,0,0.4);
+        padding: 5px 15px;
+        border-radius: 6px;
+        border: 1px solid #4a5568;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 18px;
+        font-weight: bold;
+    }
+
+    #nav-time { letter-spacing: 1px; }
+
+    /* 3. 按钮与控件 */
+    .btn {
+        padding: 8px 16px; font-size: 13px; border: none; border-radius: 4px;
+        cursor: pointer; font-weight: bold; color: white; transition: 0.2s;
+        display: flex; align-items: center; gap: 5px;
+        white-space: nowrap; flex-shrink: 0;
+    }
+    .btn:hover { filter: brightness(1.1); }
+    .btn:active { transform: translateY(1px); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-save { background: var(--success-color); }
+    .btn-orange { background: #f6ad55 !important; color: white; border: 1px solid #dd6b20; }
+    .btn-save.unsaved { background: #ecc94b !important; animation: pulse-btn 2s infinite; box-shadow: 0 0 8px rgba(229, 62, 62, 0.6); }
+    @keyframes pulse-btn { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
+    .btn-handover { background: var(--brand-primary); }
+    .btn-prev { background: #4a5568; }
+
+    /* 搜索框 */
+    .search-box { position: relative; display: flex; align-items: center; }
+    .search-input {
+        background: rgba(255,255,255,0.15);
+        border: 1px solid rgba(255,255,255,0.4);
+        border-radius: 20px;
+        color: white;
+        padding: 6px 30px 6px 12px;
+        font-size: 13px;
+        width: 140px;
+        outline: none;
+        transition: all 0.3s;
+    }
+    .search-input::placeholder { color: rgba(255,255,255,0.6); }
+    .search-input:focus {
+        width: 160px;
+        background: rgba(255,255,255,0.25);
+        border-color: rgba(255,255,255,0.7);
+    }
+    .search-clear {
+        position: absolute; right: 10px; background: none; border: none;
+        color: rgba(255,255,255,0.7); cursor: pointer; font-size: 16px;
+        padding: 0; width: 20px; height: 20px; display: none;
+    }
+    .search-clear:hover { color: white; }
+    .search-highlight, .readonly-mode .row-input.search-highlight, .readonly-mode tr.is-handover-data .row-input.search-highlight { background: #F59E0B !important; color: #78350F !important; font-weight: bold; }
+
+    /* 重复检测高亮 */
+    .duplicate-host-warning {
+        background-color: #fffdf0 !important;
+        border: none !important; box-shadow: none !important;
+        color: #b7791f !important; font-weight: 600;
+    }
+
+    /* 4. 主工作区与表格 */
+    .main-workspace { padding: 10px; flex: 1; overflow-y: scroll; scroll-behavior: smooth; }
+    .stations-grid { display: block; column-count: 2; column-gap: 15px; width: 100%; }
+
+    .station-block {
+        break-inside: avoid; display: inline-block; width: 100%; margin-bottom: 15px;
+        border: 1px solid var(--border-color); background: #fff;
+        border-radius: 8px; overflow: hidden; transition: box-shadow 0.2s;
+    }
+    .station-header {
+        background: #edf2f7; padding: 8px; text-align: center;
+        font-weight: 800; font-size: 22px; color: #2d3748;
+        border-bottom: 2px solid var(--border-color); user-select: none;
+    }
+
+    .station-split { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 10px; min-width: 600px; align-items: start; }
+    .side-pane { border-right: 1px solid #edf2f7; }
+    .side-pane:last-child { border-right: none; }
+    .side-title { font-size: 14px; text-align: center; padding: 4px; font-weight: bold; }
+    .side-title.dep { background: #ebf8ff; color: #2c5282; border-bottom: 1px solid #bee3f8; }
+    .side-title.arr { background: #fff5f5; color: #9b2c2c; border-bottom: 1px solid #fed7d7; }
+
+    .work-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .work-table th {
+        font-size: 13px; background: #f8fafc; border: 1px solid var(--border-color);
+        padding: 6px 2px; color: var(--text-secondary); font-weight: 600;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .work-table th:nth-child(1) { width: 16%; }
+    .work-table th:nth-child(2) { width: 16%; }
+    .work-table th:nth-child(3) { width: 16%; }
+    .work-table th:nth-child(4) { width: 16%; }
+    .work-table th:nth-child(5) { width: 16%; }
+    .work-table th:nth-child(6) { width: 20%; }
+    .work-table td { border: 1px solid var(--border-color); height: 28px; padding: 0; }
+    .work-table tr:focus-within { background-color: var(--warning-bg); }
+
+    .row-input, .inv-input, .ret-input {
+        width: 100%; height: 100%; border: none; padding: 0 4px;
+        font-size: 14px; outline: none; background: transparent; text-align: center;
+        transition: background 0.2s; color: var(--text-primary);
+    }
+
+    .row-input:focus, .inv-input:focus, .ret-input:focus {
+        background: var(--bg-input-focus) !important;
+        box-shadow: inset 0 0 0 2px var(--brand-primary);
+    }
+
+    .is-handover-data { color: #e53e3e !important; font-weight: 900 !important; background: #fff5f5; }
+
+    /* [Z19-FIX] 已删除 .batch-highlight 死CSS（从未在JS中被addClass使用） */
+
+    /* 5. 底部区域 */
+    #return-master-container { margin: 15px 0; border: 2px solid var(--brand-primary); border-radius: 8px; overflow: hidden; }
+    .return-header {
+        background: #2c5282 !important;
+        color: white;
+        padding: 8px 15px;
+        font-weight: bold;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        height: 40px;
+    }
+    .batch-arrival-box { display: flex; gap: 10px; align-items: center; }
+    .batch-arrival-box input { padding: 6px 12px; border: 1px solid white; border-radius: 4px; font-size: 14px; width: 300px; }
+    .batch-arrival-box button { padding: 6px 16px; background: white; color: var(--brand-primary); border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    .batch-arrival-box button:hover { background: #f0f0f0; }
+
+    .wide-footer-table { width: 100%; margin: 15px 0; border-collapse: collapse; }
+    .v-label { width: 100px; background: #f7fafc; font-weight: bold; font-size: 14px; text-align: center; border: 1px solid var(--border-color); color: #2d3748; }
+    .v-input-cell textarea { width: 100%; height: 80px; border: 1px solid var(--border-color); padding: 10px; font-size: 14px; resize: none; outline: none; display: block; }
+
+    .board-container { margin-bottom: 20px; border-radius: 8px; overflow: hidden; border: 1px solid #cbd5e0; }
+    .stats-table { width: 100%; border-collapse: collapse; background: white; table-layout: fixed; }
+    .stats-table th, .stats-table td { border: 1px solid #e2e8f0; font-size: 13px; padding: 8px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* 6. 弹窗与遮罩 */
+    #toast { display: none; position: fixed; top: 80px; right: 20px; padding: 12px 25px; background: #2d3748; color: white; border-radius: 6px; z-index: 9999; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:none; align-items:center; justify-content:center; z-index:5000; backdrop-filter: blur(4px); }
+    .custom-modal { background:white; padding:30px; border-radius:12px; width:500px; box-shadow:0 20px 40px rgba(0,0,0,0.3); border-top: 5px solid var(--brand-primary); }
+
+    /* 7. 历史模式与打印 */
+    /* [FIX CSS-B] 将 btn-next/btn-prev/btn-reconcile 的显示逻辑下移到CSS，updateUI() 只切换类名 */
+    #main-nav:not(.history-mode) #btn-next { display: none !important; }
+    #main-nav.history-mode #btn-prev { display: none !important; }
+    #main-nav.history-mode #btn-reconcile { display: none !important; }
+
+    /* 历史只读模式：禁止交互，背景轻灰，文字保持深色可读（不覆盖结转行红色）*/
+    .readonly-mode .row-input, .readonly-mode select, .readonly-mode textarea, .readonly-mode .inv-input { pointer-events: none !important; background: #f4f6f8; color: #4a5568; }
+    /* 结转行在历史模式里单独保留红色标识 */
+    .readonly-mode .is-handover-data.row-input,
+    .readonly-mode tr.is-handover-data .row-input,
+    .readonly-mode tr.is-handover-data select { color: #c53030 !important; background: #fff0f0 !important; font-weight: 700 !important; }
+    .readonly-mode .btn-save, .readonly-mode .btn-handover { display: none !important; }
+    #main-app-container.readonly-mode #stations-container,
+    #main-app-container.readonly-mode .inventory-section,
+    #main-app-container.readonly-mode .batch-arrival-box { pointer-events: none !important; }
+    #main-nav { pointer-events: auto !important; z-index: 1000; }
+    #main-nav.history-mode #btn-next { display: inline-flex !important; background-color: var(--success-color); box-shadow: 0 0 10px rgba(0,0,0,0.3); animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+    @media print {
+        .stations-grid { display: block; column-count: 2; column-gap: 20px; width: 100%; }
+        .station-block { break-inside: avoid; display: inline-block; width: 100%; margin-bottom: 20px; transform: translateZ(0); }
+        .station-split { display: grid !important; grid-template-columns: minmax(280px, 1.1fr) minmax(220px, 0.9fr) !important; gap: 10px; }
+    }
+
+    /* 8. 管理面板 (AdminPanel) 样式 */
+    .setting-group { margin-bottom: 25px; }
+    .setting-label { font-weight: 600; color: var(--text-primary); margin-bottom: 8px; font-size: 15px; }
+    .tag-container { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; min-height: 40px; background: #fff; align-content: flex-start; position: relative; }
+    .tag-input { width: 100%; margin-top: 8px; padding: 8px 12px; border: 1px dashed var(--border-color); border-radius: 4px; outline: none; font-size: 14px; transition: all 0.2s; }
+    .tag-input:focus { border-style: solid; border-color: var(--brand-primary); box-shadow: 0 0 0 2px rgba(44, 82, 130, 0.2); }
+
+    .tag-item {
+        display: inline-flex; align-items: center; background: var(--brand-primary); color: white;
+        padding: 5px 10px; border-radius: 15px; font-size: 14px; font-weight: 500;
+        transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.2s;
+        user-select: none; -webkit-user-select: none;
+    }
+    .tag-item .close-btn { margin-left: 8px; cursor: pointer; font-weight: bold; font-size: 16px; line-height: 1; opacity: 0.7; transition: opacity 0.2s; }
+    .tag-item .close-btn:hover { opacity: 1; }
+
+    .tag-item.dragging { opacity: 0.5; background: #2b6cb0 !important; transform: scale(0.95); box-shadow: 0 4px 6px rgba(0,0,0,0.1); cursor: grabbing; z-index: 100; }
+    .tag-container.drag-over { background-color: #ebf8ff; border-color: #4299e1; border-style: dashed; }
+    .tag-item[draggable="true"]:hover { cursor: grab; }
+
+    /* 9. 弹窗交互锁 */
+    body.modal-open .container { pointer-events: none; filter: blur(2px); }
+    body.modal-open .modal-overlay { pointer-events: auto; }
+    body.is-dragging-tag .tag-item { pointer-events: none !important; }
+    body.is-dragging-tag .tag-container { cursor: grabbing; }
+
+    /* 10. 历史参考行 */
+    .history-ref-row { background-color: #f0f4f8 !important; }
+    .history-ref-row td {
+        color: #4a5568 !important;
+        pointer-events: none;
+        user-select: none;
+        text-align: center;
+        font-style: normal !important;
+        font-weight: 500;
+        border: 1px solid var(--border-color);
+        height: 28px;
+        vertical-align: middle;
+        opacity: 0.8;
+    }
+
+    /* 11. 回送与库存表样式 */
+    #return-master-container .stats-table td,
+    #inventory-table td {
+        height: 30px; padding: 0; vertical-align: middle;
+    }
+    #return-master-container .stats-table input,
+    #inventory-table input {
+        width: 100%; height: 100%; border: none; background: transparent;
+        font-family: var(--font-standard); font-size: 14px; color: var(--text-primary);
+        padding: 0 8px; outline: none; transition: background 0.2s, box-shadow 0.2s;
+    }
+    #return-master-container .stats-table input:focus,
+    #inventory-table input:focus,
+    #return-master-container .stats-table select:focus {
+        background: var(--bg-input-focus); box-shadow: inset 0 0 0 2px var(--brand-primary);
+    }
+    #return-master-container .stats-table input.ret-detail { text-align: left; }
+    #return-master-container .stats-table input.ret-num,
+    #inventory-table input {
+        text-align: center; font-family: 'Consolas', monospace; font-weight: bold;
+    }
+    #return-master-container .stats-table .btn-prev { margin: 0 auto; height: 22px; line-height: 1; font-size: 12px; padding: 0 8px; }
+
+    /* 12. 下拉菜单样式 - [FIX CSS-A] 使用CSS变量消除重复SVG */
+    select.row-input,
+    .ret-f-stat,
+    .ret-t-stat {
+        -webkit-appearance: none !important; appearance: none !important;
+        background-color: transparent !important;
+        border: none !important;
+        background-image: var(--select-arrow-blue) !important;
+        background-repeat: no-repeat !important;
+        background-position: right 4px center !important;
+        background-size: 10px !important;
+        cursor: pointer !important; color: #2c5282 !important;
+        padding-right: 15px !important; text-align: center; text-align-last: center;
+    }
+
+    select#duty-selector {
+        -webkit-appearance: none !important; appearance: none !important;
+        background-color: #4a5568 !important;
+        border: 1px solid #718096 !important;
+        background-image: var(--select-arrow-white) !important;
+        background-repeat: no-repeat !important;
+        background-position: right 8px center !important;
+        background-size: 12px 12px !important;
+        color: white !important;
+        padding: 0 25px 0 25px !important;
+        min-width: 90px !important; height: 30px !important; border-radius: 4px !important;
+        text-align: center !important; text-align-last: center !important;
+        font-size: 14px !important;
+    }
+    /* 统计表格行样式类（原为renderStats内联style，MEDIUM-04提取） */
+    .st-hd  { background:#4a5568; color:white; font-weight:bold; }
+    .st-dep { background:#ebf8ff; color:#2b6cb0; font-weight:bold; }
+    .st-arr { background:#fff5f5; color:#9b2c2c; font-weight:bold; }
+    .st-th  { background:#1a202c; color:white; font-weight:bold; }
+    .st-val { font-weight:bold; font-family:'Consolas',monospace; color:#2d3748; } /* [Z1-FIX] 补全缺失的统计数值单元格样式 */
+    /* [Electron Refactor] 美化滚动条为细条，适配工控机触屏/工业屏 */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: #a0aec0; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #718096; }
+</style>
+</head>
+<body>
+    <div class="modal-overlay" id="custom-modal-overlay">
+        <div class="custom-modal">
+            <h2 id="modal-title" style="margin-bottom:15px; color:#2d3748;">确认操作</h2>
+            <div id="modal-content" style="font-size:16px; color:#4a5568; line-height:1.6; margin-bottom:25px; white-space:pre-wrap;"></div>
+            <div style="text-align:right; display:flex; justify-content:flex-end; gap:12px;">
+                <button class="btn btn-prev" onclick="Modal.close()" style="background:#cbd5e0; color:#4a5568;">取消</button>
+                <button class="btn btn-handover" id="modal-confirm-btn">确认执行</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="admin-overlay">
+        <div class="custom-modal" style="width: 900px; max-width: 90vw; max-height: 90vh; display: flex; flex-direction: column;">
+            <h2 style="color:var(--brand-primary); border-bottom:2px solid #edf2f7; padding-bottom:10px; margin-bottom:20px;">⚙️ 系统参数设置</h2>
+            <div style="flex-grow: 1; overflow-y: auto; padding-right: 15px;">
+                <div class="setting-group">
+                    <p class="setting-label">作业车站与下拉菜单选项</p>
+                    <div class="tag-container" id="tags-stations"></div>
+                    <input type="text" class="tag-input" id="input-stations" placeholder="输入车站名后按回车添加...">
+                </div>
+                <div class="setting-group">
+                    <p class="setting-label">班次名单</p>
+                    <div class="tag-container" id="tags-duties"></div>
+                    <input type="text" class="tag-input" id="input-duties" placeholder="输入班次名后按回车添加...">
+                </div>
+                <div class="setting-group">
+                    <p class="setting-label">设备分布情况</p>
+                    <div class="tag-container" id="tags-inv-stations"></div>
+                    <input type="text" class="tag-input" id="input-inv-stations" placeholder="输入设备分布点后按回车添加...">
+                </div>
+            </div>
+            <div style="margin-top:20px; text-align:right; border-top:1px solid #edf2f7; padding-top:20px; flex-shrink: 0;">
+                <button class="btn btn-prev" onclick="AdminPanel.close()" style="background:#cbd5e0; color:#4a5568;">取消</button>
+                <button class="btn btn-save" onclick="AdminPanel.applyConfig()">保存并刷新</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="main-app-container">
+        <nav class="top-nav" id="main-nav">
+            <div class="nav-left">
+                <div class="clock-box">
+                    <span id="nav-date"></span>
+                    <span id="nav-day-night" style="margin: 0 5px; color: #f6ad55;"></span>
+                    <span id="nav-time"></span>
+                    <select id="duty-selector" class="duty-select" onchange="AppState.data.currentDuty=this.value; AppActions.triggerAutoSave()"></select>
+                </div>
+            </div>
+            <div class="nav-center">
+                <h1 id="nav-title">合肥东站列尾作业大表</h1>
+            </div>
+            <div class="nav-right">
+                <div class="search-box">
+                    <input type="text" class="search-input" id="global-search" placeholder="🔍 搜索主机号..." />
+                    <button class="search-clear" id="search-clear" onclick="SearchModule.clear()">✕</button>
+                </div>
+                <button class="btn btn-save" id="btn-manual-save" onclick="try{AppActions.manualSave()}catch(e){Logger.critical('Save',e);UI.toast('保存失败')}">保存</button>
+                <button class="btn btn-orange" id="btn-reconcile" onclick="ReconcileModule.reconcile()">批量到达</button>
+                <button class="btn btn-prev" id="btn-history" onclick="HistoryModule.open()">历史</button>
+                <button class="btn btn-prev" id="btn-prev" onclick="HistoryModule.loadPrevious()">上一页</button>
+                <button class="btn btn-prev" id="btn-next" onclick="HistoryModule.exitHistory()">返回当前</button>
+                <button class="btn btn-handover" id="btn-hand" onclick="try{AppActions.confirmHandover()}catch(e){Logger.critical('Handover',e);UI.toast('交班失败')}">交班</button>
+                <button class="btn" style="background:#4a5568; padding:8px;" onclick="AdminPanel.open()">⚙️</button>
+            </div>
+        </nav>
+
+        <div class="main-workspace">
+            <div class="stations-grid" id="stations-container"></div>
+
+            <div id="return-master-container">
+                <div class="return-header">
+                    <span>🔄 回送列尾清单 (未选择到站则进入交班结转)</span>
+                </div>
+                <table class="stats-table">
+                    <thead>
+                        <tr style="background:#f7fafc;">
+                            <th style="width:120px;">发出站</th>
+                            <th>回送详情 (车次/主机号/流向)</th>
+                            <th style="width:120px;">到达车站 (选后交班清除)</th>
+                            <th style="width:80px;">数量</th>
+                            <th style="width:70px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="return-tbody"></tbody>
+                </table>
+            </div>
+
+            <div class="board-container">
+                <div style="background:#2c5282; color:white; padding:8px 15px; font-weight:bold;">📊 交班点生产任务完成情况</div>
+                <table class="stats-table" id="stats-main-table">
+                    <tr id="stats-row-names"></tr>
+                    <tr id="stats-row-types"></tr>
+                    <tr id="stats-row-values"></tr>
+                </table>
+            </div>
+
+            <div class="board-container">
+                <div style="background:#2c5282; color:white; padding:8px 15px; font-weight:bold; display:flex; justify-content:space-between;">
+                    <span>📟 各作业点主机分布情况</span>
+                    <span id="inv-total-sum">总计: 0</span>
+                </div>
+                <table class="stats-table" id="inventory-table">
+                    <tr id="inv-row-names"></tr>
+                    <tr id="inv-row-vals"></tr>
+                </table>
+            </div>
+
+            <table class="wide-footer-table">
+                <tr><td class="v-label">班中重点事项说明</td><td class="v-input-cell"><textarea id="note-important" oninput="AppActions.triggerAutoSave()"></textarea></td></tr>
+                <tr><td class="v-label">安全生产分析</td><td class="v-input-cell"><textarea id="note-safety" oninput="AppActions.triggerAutoSave()"></textarea></td></tr>
+                <tr><td class="v-label">交接班内容</td><td class="v-input-cell"><textarea id="note-handover" oninput="AppActions.triggerAutoSave()">设备良好，安全无事</textarea></td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script>
+'use strict';
+
+/* ==================== 1. 时间常量 ==================== */
+const TIME = {
+    SECOND: 1000,
+    MINUTE: 60 * 1000,
+    HOUR: 60 * 60 * 1000
+};
+
+/* ==================== 2. DOM元素ID常量 ==================== */
+const DOM_IDS = {
+    NAV_DATE: 'nav-date',
+    NAV_TIME: 'nav-time',
+    NAV_DAY_NIGHT: 'nav-day-night',
+    NAV_TITLE: 'nav-title',
+    DUTY_SELECTOR: 'duty-selector',
+    MAIN_CONTAINER: 'main-app-container',
+    MAIN_NAV: 'main-nav',
+    STATIONS_CONTAINER: 'stations-container',
+    RETURN_TBODY: 'return-tbody',
+    STATS_ROW_NAMES: 'stats-row-names',
+    STATS_ROW_TYPES: 'stats-row-types',
+    STATS_ROW_VALUES: 'stats-row-values',
+    INV_ROW_NAMES: 'inv-row-names',
+    INV_ROW_VALS: 'inv-row-vals',
+    INV_TOTAL_SUM: 'inv-total-sum',
+    NOTE_IMPORTANT: 'note-important',
+    NOTE_SAFETY: 'note-safety',
+    NOTE_HANDOVER: 'note-handover',
+    GLOBAL_SEARCH: 'global-search',
+    SEARCH_CLEAR: 'search-clear',
+    BTN_MANUAL_SAVE: 'btn-manual-save',
+    BTN_HISTORY: 'btn-history',
+    BTN_PREV: 'btn-prev',
+    BTN_NEXT: 'btn-next',
+    BTN_HAND: 'btn-hand',
+    MODAL_OVERLAY: 'custom-modal-overlay',
+    MODAL_TITLE: 'modal-title',
+    MODAL_CONTENT: 'modal-content',
+    MODAL_CONFIRM_BTN: 'modal-confirm-btn',
+    ADMIN_OVERLAY: 'admin-overlay',
+    TOAST: 'toast'
+};
+
+/* ==================== 3. 配置常量 ==================== */
+const CONFIG = {
+    VERSION: "2026.V5.SCHEMA.1",
+    AUTO_SAVE_INTERVAL: 30 * TIME.SECOND,  // 有人值守场景，30s自动保存足够，减少写盘频次
+    DUPLICATE_CHECK_DELAY: 500,
+    TOAST_DURATION: 3 * TIME.SECOND,
+    CLEANUP_INTERVAL: 0,  // 有人值守每天两班，仅启动时清理一次，不需要定时器
+    KEYS: {
+        MAIN_DATA: 'HF_CURRENT_RUNNING_DATA',
+        PREVIOUS_BACKUP: 'HF_PREVIOUS_BACKUP_DATA',
+        SETTINGS: 'HF_RW_INDUSTRIAL_V2026',
+        SETTINGS_CHANGE_BACKUP: 'HF_SETTINGS_CHANGE_BACKUP'
+    },
+    DEFAULT: {
+        stations: ["合肥东站", "淮南西站", "芜湖东站", "蚌埠东站", "阜阳北站", "九江西站", "安庆北站", "安庆西站", "铜陵西站"],
+        invStations: ["合肥东三场", "合肥东五场", "合肥东一场", "淮南西站", "芜湖东站", "蚌埠东站", "阜阳北站", "九江西站", "安庆西站", "安庆北站", "铜陵西站", "维修组", "库存"],
+        duties: ["一班", "二班", "三班", "四班"]
+    },
+    FIELDS: {
+        DEPARTURE: [
+            {k:'trainNo', l:'车次'},
+            {k:'time', l:'时间'},
+            {k:'locoNo', l:'机车'},
+            {k:'hostNo', l:'主机号'},
+            {k:'battNo', l:'电池号'},
+            {k:'toStation', l:'到站', t:'select'}
+        ],
+        ARRIVAL: [
+            {k:'trainNo', l:'车次'},
+            {k:'time', l:'时间'},
+            {k:'locoNo', l:'机车'},
+            {k:'hostNo', l:'主机号'},
+            {k:'battNo', l:'电池号'},
+            {k:'fromStation', l:'发站', t:'select'}
+        ]
+    },
+    LIMITS: {
+        MAX_AUDIT_LOG: 50,         // 每天两班有限操作量，50条内存日志足够
+        AUDIT_CLEANUP_THRESHOLD: 40
+    },
+    // [CRITICAL-02] 一天两班，保留10天=20条，单班最多500条≈60KB，20条≈1.2MB，安全
+    HISTORY_MAX_COUNT: 20,
+    HISTORY_MAX_DAYS: 10,
+    WARN_WRITE_SIZE_BYTES: 200 * 1024  // 写入大小告警阈值
+};
+
+/* ==================== 4. 循环缓冲区类 ==================== */
+class CircularBuffer {
+    constructor(size) {
+        this.size = size;
+        this.buffer = new Array(size);
+        this.head = 0;
+        this.count = 0;
+    }
+    push(item) {
+        this.buffer[this.head] = item;
+        this.head = (this.head + 1) % this.size;
+        if (this.count < this.size) this.count++;
+    }
+    getAll() {
+        if (this.count < this.size) return this.buffer.slice(0, this.count);
+        return [...this.buffer.slice(this.head), ...this.buffer.slice(0, this.head)];
+    }
+    clear() {
+        this.buffer = new Array(this.size);
+        this.head = 0;
+        this.count = 0;
+    }
+}
+
+/* ==================== 5. DOM缓存系统 ==================== */
+const DOMCache = {
+    elements: new Map(),
+    tables: new Map(),
+    initialized: false,
+
+    _cacheTables() {
+        try {
+            if (AppState.config.stations) {
+                AppState.config.stations.forEach(station => {
+                    ['arrival', 'departure'].forEach(side => {
+                        const table = document.querySelector(
+                            // [Y2-FIX] 与 _createTable 的转义保持一致，防止站名含"时selector语法错误
+                            `table[data-station="${Util.escapeHTML(station)}"][data-side="${side}"]`
+                        );
+                        if (table) this.tables.set(`${station}-${side}`, table);
+                    });
+                });
+            }
+        } catch (e) {
+            Logger.error('DOMCache._cacheTables failed', e);
+        }
+    },
+
+    init() {
+        try {
+            Object.values(DOM_IDS).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) this.elements.set(id, el);
+            });
+            this._cacheTables();
+            this.initialized = true;
+            Logger.info('DOM cache initialized', { elements: this.elements.size, tables: this.tables.size });
+        } catch (e) {
+            Logger.error('DOM cache init failed', e);
+        }
+    },
+
+    getElement(id) {
+        if (!this.initialized) return document.getElementById(id);
+        return this.elements.get(id) || document.getElementById(id);
+    },
+
+    getTable(station, side) {
+        return this.tables.get(`${station}-${side}`) || null;
+    },
+
+    refreshTables() {
+        try {
+            this.tables.clear();
+            this._cacheTables();
+            Logger.info('Tables cache refreshed');
+        } catch (e) {
+            Logger.error('Refresh tables cache failed', e);
+        }
+    },
+
+    clear() {
+        this.elements.clear();
+        this.tables.clear();
+        this.initialized = false;
+    }
+};
+
+/* ==================== 6. 应用状态管理 ==================== */
+const AppState = {
+    system: {
+        isHistoryMode: false,
+        isSaving: false,
+        isComposing: false,
+        isPasting: false  // [PASTE-LOCK FIX] paste 期间锁，防止 onCellInput 删行导致游标失效
+        // [MEDIUM-A FIX] 删除死字段：isReady(只赋值不读取)、handoverLock(从未使用)
+    },
+    data: {
+        modified: false,
+        lastSaved: null,
+        currentDuty: '一班'
+    },
+    config: {
+        stations: [],
+        duties: [],
+        invStations: [],
+        dropdowns: []
+    },
+    audit: new CircularBuffer(CONFIG.LIMITS.MAX_AUDIT_LOG),
+
+    async init() {
+        try {
+            // [Electron Refactor] 配置通过 Storage.get 读取（底层已改为 electronAPI.loadData）
+            const configRaw = await Storage.get(CONFIG.KEYS.SETTINGS);
+            let config = null;
+            if (configRaw) {
+                try {
+                    const parsed = typeof configRaw === 'string' ? JSON.parse(configRaw) : configRaw;
+                    if (Array.isArray(parsed.stations)) config = parsed;
+                } catch(e) {
+                    Logger.warn('Config parse failed, using default', e);
+                }
+            }
+            // [Electron Refactor] 配置兜底：缺失或为空时使用 CONFIG.DEFAULT 初始化，防止班次下拉菜单空白
+            if (!config || !config.duties || config.duties.length === 0) {
+                Logger.warn('[AppState.init] Config missing or empty, using CONFIG.DEFAULT');
+                config = Util.deepClone(CONFIG.DEFAULT);
+            }
+
+            const { stations: dSt, duties: dDt, invStations: dInv } = CONFIG.DEFAULT;
+            // [AUDIT-FIX-2] 空数组是 Truthy，|| 运算符无法兜底。必须显式检查 length
+            this.config.stations    = (Array.isArray(config.stations)    && config.stations.length    > 0) ? config.stations    : dSt.slice();
+            this.config.duties      = (Array.isArray(config.duties)      && config.duties.length      > 0) ? config.duties      : dDt.slice();
+            this.config.invStations = (Array.isArray(config.invStations) && config.invStations.length > 0) ? config.invStations : dInv.slice();
+            this.config.dropdowns   = (Array.isArray(config.dropdowns)   && config.dropdowns.length   > 0) ? config.dropdowns   : this.config.stations.slice();
+
+            Logger.info('State initialized', { stations: this.config.stations.length });
+            return true;
+        } catch (e) {
+            Logger.critical('State init failed', e);
+            // [Electron Refactor] 配置兜底：异常时强制使用默认值
+            this.config = Util.deepClone(CONFIG.DEFAULT);
+            this.config.dropdowns = this.config.stations.slice();
+            return false;
+        }
+    },
+
+    setHistoryMode(enabled) {
+        this.system.isHistoryMode = enabled;
+        this.updateUI();
+    },
+
+    // [CSS-B] updateUI 只切换类名，显示/隐藏逻辑完全由CSS驱动
+    updateUI() {
+        try {
+            const container = DOM.getElement(DOM_IDS.MAIN_CONTAINER);
+            const nav = DOM.getElement(DOM_IDS.MAIN_NAV);
+            container?.classList.toggle('readonly-mode', this.system.isHistoryMode);
+            nav?.classList.toggle('history-mode', this.system.isHistoryMode);
+        } catch (e) {
+            Logger.error('UI update failed', e);
+        }
+    }
+};
+
+/* ==================== 7. 日志模块 [Electron Refactor] - 极简稳定版 ==================== */
+const Logger = {
+    // [SIMPLIFY] 移除所有 IPC 缓冲逻辑，回归最简单的内存记录 + 控制台输出
+    // 酷睿12代性能强劲，内存充足，简单的 console 输出足以满足调试需求
+
+    // [S10-FIX] 移除无意义的 cleanup setInterval——CircularBuffer 自动覆盖旧数据，无需定时清理
+    startAutoCleanup() {},
+    stopAutoCleanup() {},
+
+    log(level, message, data = null) {
+        try {
+            // 1. 存入内存环形缓冲区 (供崩溃弹窗使用)
+            // [MEM-LOGGER FIX] 严格去对象化，切断原型链引用，防止 Event/DOM 对象进入缓冲区被 GC 忽视
+            let safeData = null;
+            if (data instanceof Error) {
+                safeData = { message: data.message, stack: data.stack, name: data.name };
+            } else if (data === null || data === undefined || typeof data !== 'object') {
+                safeData = data; // string/number/boolean 直接存
+            } else {
+                // 对象类型：序列化后反序列化，彻底切断 DOM/Event 等引用链
+                try { safeData = JSON.parse(JSON.stringify(data)); } catch (_) { safeData = String(data); }
+            }
+            const entry = {
+                ts: new Date().toISOString(),
+                lv: level,
+                msg: message,
+                dt: safeData
+            };
+            AppState.audit.push(entry);
+
+            // 2. 标准控制台输出
+            // Electron 主进程若开启 --enable-logging 即可自动捕获这些输出到文件
+            const args = [message, data || ''].filter(Boolean);
+            if (level === 'ERROR' || level === 'CRITICAL') {
+                console.error(`[${level}]`, ...args);
+            } else if (level === 'WARN') {
+                console.warn(`[${level}]`, ...args);
+            } else {
+                console.log(`[${level}]`, ...args);
+            }
+            
+        } catch (e) {
+            // 最后的兜底，防止日志模块本身炸了导致死循环
+            console.error('[LOGGER] Log failed', e);
+        }
+    },
+
+    getAll() { return AppState.audit.getAll(); },
+    info(msg, data)     { this.log('INFO', msg, data); },
+    warn(msg, data)     { this.log('WARN', msg, data); },
+    error(msg, data)    { this.log('ERROR', msg, data); },
+    critical(msg, data) { this.log('CRITICAL', msg, data); }
+};
+
+/* ==================== 8. DOM操作模块 ==================== */
+const DOM = {
+    getElement(id) {
+        try {
+            if (!id) return null;
+            const cached = DOMCache.getElement(id);
+            if (cached) return cached;
+            const el = document.getElementById(id);
+            if (!el) Logger.warn(`Element not found: ${id}`);
+            return el;
+        } catch (e) {
+            Logger.error(`getElement failed for ${id}`, e);
+            return null;
+        }
+    },
+
+    _appRoot: null,
+    _getAppRoot() {
+        if (!this._appRoot) {
+            this._appRoot = document.getElementById('main-app-container') || document.body;
+        }
+        return this._appRoot;
+    },
+
+    queryAll(selector) {
+        try {
+            return Array.from(this._getAppRoot().querySelectorAll(selector));
+        } catch (e) {
+            Logger.error(`queryAll failed for ${selector}`, e);
+            return [];
+        }
+    },
+
+    setText(id, text) {
+        try {
+            const el = this.getElement(id);
+            if (el) { el.innerText = String(text); return true; }
+            return false;
+        } catch (e) {
+            Logger.error(`setText failed for ${id}`, e);
+            return false;
+        }
+    },
+
+    getValue(id) {
+        try {
+            const el = this.getElement(id);
+            return el ? (el.value || '') : '';
+        } catch (e) {
+            Logger.error(`getValue failed for ${id}`, e);
+            return '';
+        }
+    },
+
+    setValue(id, value) {
+        try {
+            const el = this.getElement(id);
+            if (el) { el.value = String(value); return true; }
+            return false;
+        } catch (e) {
+            Logger.error(`setValue failed for ${id}`, e);
+            return false;
+        }
+    }
+};
+
+/* ==================== 9. 工具函数模块 ==================== */
+const Util = {
+    deepClone(obj) {
+        try {
+            if (typeof structuredClone === 'function') return structuredClone(obj);
+            return JSON.parse(JSON.stringify(obj));
+        } catch (e) {
+            Logger.error('Deep clone failed', e);
+            try { return Object.assign(Array.isArray(obj) ? [] : {}, obj); }
+            catch (_) { return obj; }
+        }
+    },
+
+    _bootTime: Date.now(),
+    _monoCounter: 0,
+    monoId() {
+        const now = Date.now();
+        const ts = now >= this._bootTime ? now : Math.floor(this._bootTime + performance.now());
+        return `${ts}_${++this._monoCounter}`;
+    },
+
+    // [NEW-10 FIX] 正则替换，零 DOM 开销
+    // [this-fix] 用闭包常量避免 this 上下文丢失问题
+    escapeHTML: (() => {
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+        return (str) => {
+            if (str == null || str === '') return '';
+            return String(str).replace(/[&<>"']/g, c => map[c]);
+        };
+    })(),
+
+    truncate(str, maxLength) {
+        if (!str) return "";
+        return String(str).slice(0, maxLength);
+    },
+
+    safeInt(value, defaultValue = 0) {
+        const num = parseInt(value);
+        return isNaN(num) ? defaultValue : num;
+    },
+
+    // [T8-FIX] 将任意字符串转为合法 DOM ID（去除空格特殊字符，保留中文和字母数字）
+    toId(str) {
+        return String(str).replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '_');
+    },
+
+    debounce(func, delay) {
+        let timer = null;
+        return function(...args) {
+            clearTimeout(timer);
+            timer = setTimeout(() => func.apply(this, args), delay);
+        };
+    }
+};
+
+/* ==================== 10. 存储模块 [Electron Refactor] - 极简稳定版 ==================== */
+const Storage = {
+    _totalCapacity: 5 * 1024 * 1024, // 兼容健康检查占位
+
+    CORRUPT: Symbol('STORAGE_CORRUPT'),
+
+    // [SIMPLIFY] 移除复杂的 _writeQueue 队列，依靠 JS 单线程特性和 await 顺序执行
+    
+    async saveMainData(data) {
+        try {
+            if (!window.electronAPI || typeof window.electronAPI.saveData !== 'function') {
+                Logger.error('[Storage] electronAPI.saveData 不可用');
+                return false;
+            }
+            return await this.set(CONFIG.KEYS.MAIN_DATA, data);
+        } catch (e) {
+            Logger.critical('[Storage] saveMainData IPC 异常', e);
+            return false;
+        }
+    },
+
+    _memStore: new Map(),
+    // [OOM-QUEUE FIX] 数组队列替代 Promise 链：
+    // Promise 链无限 .then 拼接会导致 V8 无法回收前置节点的闭包上下文（7×24运行必OOM）
+    // 数组队列：任务执行完毕立即 shift() 丢弃，切断所有引用，GC 正常回收
+    _writeQueue: [],
+    _isWriting: false,
+    _enqueueWrite(fn) {
+        return new Promise((resolve) => {
+            this._writeQueue.push(async () => {
+                try {
+                    await fn();
+                } catch (e) {
+                    Logger.critical('[Storage._writeQueue] 写队列异常', e);
+                    // [FATAL-QUEUE-CACHE FIX] 写失败后立即失效缓存，
+                    // 强制下一任务重读磁盘，防止脏缓存写回覆盖已删除的数据
+                    this._invalidateCache();
+                } finally {
+                    resolve();
+                }
+            });
+            this._drainQueue();
+        });
+    },
+    async _drainQueue() {
+        if (this._isWriting) return; // 已有消费者在跑，不重入
+        this._isWriting = true;
+        while (this._writeQueue.length > 0) {
+            const task = this._writeQueue.shift(); // 取出后立即丢弃引用，GC 可回收
+            await task();
+        }
+        this._isWriting = false;
+    },
+
+    async set(key, value) {
+        try {
+            // 判断是否需要持久化到硬盘的 Key
+            if (key === CONFIG.KEYS.MAIN_DATA || key === CONFIG.KEYS.PREVIOUS_BACKUP ||
+                key === CONFIG.KEYS.SETTINGS || key === CONFIG.KEYS.SETTINGS_CHANGE_BACKUP ||
+                key.startsWith('HF_HISTORY_')) {
+
+                // 1. 获取最新全量数据 (带缓存)
+                const allData = await this._loadAllData();
+                
+                // 2. 构造新数据对象 (浅拷贝，避免污染缓存)
+                const nextData = Object.assign({}, allData, { [key]: value });
+
+                // 3. 通过写队列调用主进程保存 (串行原子写入)
+                let writeResult = false;
+                await this._enqueueWrite(async () => {
+                    const result = await window.electronAPI.saveData(nextData);
+                    if (result && result.success) {
+                        this._cachedAllData = nextData;
+                        this._cacheTs = Date.now();
+                        writeResult = true;
+                    } else {
+                        Logger.error('[Storage.set] saveData 失败', result?.error);
+                    }
+                });
+                return writeResult;
+            }
+
+            // 不需要持久化的 Key 存入内存 Map
+            this._memStore.set(key, value);
+            return true;
+
+        } catch (e) {
+            Logger.critical('[Storage.set] 异常', e);
+            return false;
+        }
+    },
+
+    async get(key, parseJSON = true) {
+        try {
+            if (key === CONFIG.KEYS.MAIN_DATA || key === CONFIG.KEYS.PREVIOUS_BACKUP ||
+                key === CONFIG.KEYS.SETTINGS || key === CONFIG.KEYS.SETTINGS_CHANGE_BACKUP ||
+                key.startsWith('HF_HISTORY_')) {
+                const allData = await this._loadAllData();
+                return Object.prototype.hasOwnProperty.call(allData, key) ? allData[key] : null;
+            }
+            const v = this._memStore.get(key);
+            return v !== undefined ? v : null;
+        } catch (e) {
+            Logger.error('[Storage.get] 异常', e);
+            return null;
+        }
+    },
+
+    async remove(key) {
+        try {
+            const allData = await this._loadAllData();
+            // 检查 Key 是否存在于硬盘数据中
+            if (Object.prototype.hasOwnProperty.call(allData, key) ||
+                Object.prototype.hasOwnProperty.call(allData, key + '_BAK')) {
+                
+                const nextData = Object.assign({}, allData);
+                delete nextData[key];
+                delete nextData[key + '_BAK'];
+
+                // [QUEUE-REMOVE FIX] 通过 _enqueueWrite 串行化
+                await this._enqueueWrite(async () => {
+                    const result = await window.electronAPI.saveData(nextData);
+                    if (result && result.success) {
+                        this._cachedAllData = nextData;
+                        this._cacheTs = Date.now();
+                    } else {
+                        this._invalidateCache();
+                    }
+                });
+            }
+            // 同时清理内存 Store
+            this._memStore.delete(key);
+            return true;
+        } catch (e) {
+            Logger.error('[Storage.remove] 异常', e);
+            return false;
+        }
+    },
+
+    _cachedAllData: null,
+    _cacheTs: 0,
+
+    async _loadAllData() {
+        // 缓存策略：5秒内有效，减少高频读取时的 IO
+        if (this._cachedAllData && Date.now() - this._cacheTs < 5000) {
+            return this._cachedAllData;
+        }
+        try {
+            const raw = await window.electronAPI.loadData();
+            this._cachedAllData = raw || {};
+            this._cacheTs = Date.now();
+            return this._cachedAllData;
+        } catch (e) {
+            // [FATAL-IO FIX] 磁盘繁忙/杀软锁定/IPC失败时：
+            // 若有缓存则返回缓存（安全，数据仍完整）；
+            // 若无缓存则必须 throw 阻断调用链——绝不返回 {}，
+            // 否则调用方会把"空对象+新增Key"写盘，清空所有历史记录。
+            if (this._cachedAllData) {
+                Logger.warn('[Storage._loadAllData] IPC失败，使用内存缓存', e);
+                return this._cachedAllData;
+            }
+            Logger.critical('[Storage._loadAllData] IPC失败且无缓存，阻断写入', e);
+            throw e; // 向上传播，调用方的 catch 处理，不会写盘
+        }
+    },
+
+    _invalidateCache() {
+        this._cachedAllData = null;
+        this._cacheTs = 0;
+    },
+
+    async scanHistoryKeys() {
+        try {
+            const allData = await this._loadAllData();
+            return Object.keys(allData)
+                .filter(k => k.startsWith('HF_HISTORY_') && !k.endsWith('_BAK'))
+                .map(key => {
+                    const suffix = key.slice('HF_HISTORY_'.length);
+                    const parts  = suffix.split('_');
+                    const ts      = parseInt(parts[0], 10);
+                    const counter = parseInt(parts[1] || '0', 10);
+                    return isNaN(ts) ? null : { key, timestamp: ts, counter };
+                })
+                .filter(Boolean)
+                .sort((a, b) => b.timestamp - a.timestamp || b.counter - a.counter);
+        } catch (e) {
+            Logger.error('[Storage.scanHistoryKeys] 异常', e);
+            return [];
+        }
+    },
+
+    _estimateUsed() {
+        return 0;
+    }
+    // [X9-FIX] 已删除 _unwrap 方法：PREVIOUS_BACKUP 始终以普通对象写入，wrapped 格式从未被使用
+};
+
+/* ==================== 11. UI交互模块 ==================== */
+const SaveIndicator = {
+    _el: null,
+    _get() {
+        if (!this._el) this._el = document.getElementById('btn-manual-save');
+        return this._el;
+    },
+    // [R18-FIX] 每个状态完整更新 class 和 text，不互相干扰
+    setModified() {
+        const btn = this._get();
+        if (btn) { btn.classList.add('unsaved'); btn.textContent = '待存'; }
+    },
+    setPending() {
+        const btn = this._get();
+        if (btn) { btn.classList.remove('unsaved'); btn.textContent = '存...'; }
+    },
+    setSaved() {
+        const btn = this._get();
+        if (btn) { btn.classList.remove('unsaved'); btn.textContent = '保存'; }
+    },
+    setFailed() {
+        const btn = this._get();
+        if (btn) { btn.classList.add('unsaved'); btn.textContent = '失败'; }
+    }
+};
+
+/* ==================== 11. UI交互模块 ==================== */
+const UI = {
+    _toastTimer: null,
+
+    // [FIX] 增加 duration 参数，默认值 3000ms
+    toast(message, duration = CONFIG.TOAST_DURATION) {
+        try {
+            const toast = DOM.getElement(DOM_IDS.TOAST);
+            if (!toast) {
+                console.warn('[UI.toast]', message);
+                return;
+            }
+
+            clearTimeout(this._toastTimer);
+
+            toast.innerText = message;
+            toast.style.display = 'block';
+
+            this._toastTimer = setTimeout(() => {
+                toast.style.display = 'none';
+            }, duration);
+        } catch (e) {
+            // [Safety] 降级处理：防止 Logger 未初始化导致报错
+            if (typeof Logger !== 'undefined' && Logger.error) {
+                Logger.error('Toast failed', e);
+            } else {
+                console.error('Toast failed', e);
+            }
+        }
+    },
+
+    confirm(message) { return confirm(message); }
+};
+
+/* ==================== 12. 模态框模块 ==================== */
+const Modal = {
+    _clickShieldTimer: null,
+    _clickShielded: false,
+
+    show(options) {
+        try {
+            const { title, content, onConfirm } = this._parseOptions(options);
+            const titleEl   = DOM.getElement(DOM_IDS.MODAL_TITLE);
+            const contentEl = DOM.getElement(DOM_IDS.MODAL_CONTENT);
+            const overlay   = DOM.getElement(DOM_IDS.MODAL_OVERLAY);
+            const btnEl     = DOM.getElement(DOM_IDS.MODAL_CONFIRM_BTN);
+
+            if (!overlay || !titleEl || !contentEl || !btnEl) {
+                // 降级：控制台输出，不使用 alert
+                console.warn('[Modal.show] DOM not ready, message:', content);
+                return;
+            }
+
+            titleEl.innerText = title;
+
+            const isHTML = options && options.isHTML === true;
+            if (isHTML) {
+                contentEl.innerHTML = content;
+            } else {
+                contentEl.textContent = String(content);
+            }
+
+            overlay.style.display = 'flex';
+            document.body.classList.add('modal-open');
+
+            if (onConfirm) {
+                btnEl.onclick = () => {
+                    try { onConfirm(); } catch(e) { Logger.error('Modal confirm callback failed', e); }
+                    this.close();
+                };
+                btnEl.style.display = 'inline-block';
+            } else {
+                btnEl.style.display = 'none';
+            }
+        } catch (e) {
+            Logger.error('Modal show failed', e);
+        }
+    },
+
+    close() {
+        try {
+            const overlay = DOM.getElement(DOM_IDS.MODAL_OVERLAY);
+            if (overlay) overlay.style.display = 'none';
+            document.body.classList.remove('modal-open');
+            this._clickShielded = true;
+            clearTimeout(this._clickShieldTimer);
+            this._clickShieldTimer = setTimeout(() => { this._clickShielded = false; }, 200);
+        } catch (e) {
+            Logger.error('Modal close failed', e);
+        }
+    },
+
+    _parseOptions(options) {
+        if (typeof options === 'object' && options !== null) {
+            return {
+                title: options.title || '提示',
+                content: options.content || '',
+                onConfirm: options.confirm || options.onConfirm
+            };
+        }
+        if (typeof options === 'string') {
+            return { title: '提示', content: options, onConfirm: null };
+        }
+        return { title: '提示', content: '', onConfirm: null };
+    }
+};
+
+/* ==================== 13. 时钟模块 ==================== */
+const ClockModule = {
+    timer: null,
+    lastUpdate: 0,
+    // [MEDIUM-A FIX] 删除 missedBeats 死字段（注释已说明移除，字段却保留）
+
+        start() {
+        // 1. 立即执行一次，避免初始空白
+        this.update();
+        this.lastUpdate = Date.now();
+
+        // 2. 启动定时器
+        // [MED-CLOCK FIX] 改用递归 setTimeout 对齐下一秒整点，而非 setInterval 固定间隔。
+        // setInterval 在 Windows 深度休眠唤醒后会补偿丢失的 tick，瞬间触发数百次。
+        // 递归 setTimeout 每次动态计算距下一秒整点的剩余毫秒，精准、无风暴、无漂移。
+        if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+        const _tick = () => {
+            const now = Date.now();
+            const elapsed = now - this.lastUpdate;
+            if (elapsed > 5000) {
+                console.warn(`[Clock] System lag/suspended for ${elapsed}ms`);
+            }
+            this.update();
+            this.lastUpdate = now;
+            // 计算距下一秒整点的精确延迟，始终保持与系统时钟同步
+            this.timer = setTimeout(_tick, 1000 - (Date.now() % 1000));
+        };
+        this.timer = setTimeout(_tick, 1000 - (Date.now() % 1000));
+    },
+
+    stop() {
+        if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    },
+
+    update() {
+        try {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+            const timeStr = now.toLocaleTimeString('zh-CN', { hour12: false });
+            const hours = now.getHours();
+            const shift = hours >= 6 && hours < 18 ? '白班' : '夜班';
+            const icon  = hours >= 6 && hours < 18 ? '🌞' : '🌙';
+            
+            DOM.setText(DOM_IDS.NAV_DATE, dateStr);
+            DOM.setText(DOM_IDS.NAV_TIME, timeStr);
+            DOM.setText(DOM_IDS.NAV_DAY_NIGHT, icon + ' ' + shift);
+
+            
+        } catch (e) {
+            Logger.error('Clock update failed', e);
+        }
+    }
+};
+
+/* ==================== 14. 搜索模块 ==================== */
+const SearchModule = {
+    _initialized: false,
+    init() {
+        // [MED-1 FIX] searchInput 上的 input 监听器，重复注册会叠加，必须守卫
+        if (this._initialized) return;
+        this._initialized = true;
+        try {
+            const searchInput = DOM.getElement(DOM_IDS.GLOBAL_SEARCH);
+            const searchClear = DOM.getElement(DOM_IDS.SEARCH_CLEAR);
+            if (!searchInput) return;
+
+            const _debouncedSearch = Util.debounce((keyword) => { this.perform(keyword); }, 300);
+
+            searchInput.addEventListener('input', (e) => {
+                const keyword = e.target.value.trim();
+                if (searchClear) searchClear.style.display = keyword ? 'block' : 'none';
+                _debouncedSearch(keyword);
+            });
+
+            Logger.info('Search module initialized');
+        } catch (e) {
+            Logger.error('Search init failed', e);
+        }
+    },
+
+    perform(keyword) {
+        try {
+            DOM.queryAll('.search-highlight').forEach(el => el.classList.remove('search-highlight'));
+            if (!keyword) return;
+            const kw = keyword.toLowerCase();
+            let matchCount = 0;
+            DOM.queryAll('.row-input').forEach(input => {
+                if (input.dataset.key === 'hostNo' && input.value) {
+                    if (input.value.toLowerCase().includes(kw)) {
+                        input.classList.add('search-highlight');
+                        matchCount++;
+                    }
+                }
+            });
+            if (matchCount > 0) UI.toast(`✅ 找到 ${matchCount} 个匹配的主机号`);
+        } catch (e) {
+            Logger.error('Search perform failed', e);
+        }
+    },
+
+    clear() {
+        try {
+            DOM.setValue(DOM_IDS.GLOBAL_SEARCH, '');
+            const searchClear = DOM.getElement(DOM_IDS.SEARCH_CLEAR);
+            if (searchClear) searchClear.style.display = 'none';
+            this.perform('');
+        } catch (e) {
+            Logger.error('Search clear failed', e);
+        }
+    }
+};
+
+/* ==================== 15. 重复检测模块 (SRE Simplified) ==================== */
+const DuplicateCheckModule = {
+    timer: null,
+    // 只保留告警时间戳，用于控制弹窗频率
+    _warningStartTimes: new Map(),
+
+    _initialized: false,
+    init() {
+        // [FATAL-2 FIX] document 级监听器，重复注册会叠加触发，必须守卫
+        if (this._initialized) return;
+        this._initialized = true;
+        try {
+            // [SRE] 简化事件监听：不再进行复杂的增量索引更新，仅触发防抖检查
+            document.addEventListener('input', (e) => {
+                if (e.target.matches && e.target.matches('.row-input[data-key="hostNo"]')) {
+                    this.scheduleCheck();
+                }
+            });
+            // [SCAN-GUN FIX] focusout 即时触发：扫码枪 Enter 切焦点时立即截断防抖执行检查，
+            // 防止防抖被后续输入事件不断 reset，扫完10条才检查前9条的重复
+            document.addEventListener('focusout', (e) => {
+                if (e.target.matches && e.target.matches('.row-input[data-key="hostNo"]') && e.target.value) {
+                    clearTimeout(this.timer);
+                    this.check();
+                }
+            });
+            Logger.info('Duplicate check module initialized (SRE Simplified)');
+        } catch (e) { Logger.error('Init failed', e); }
+    },
+
+    rebuildIndex() {
+        this.scheduleCheck();
+    },
+
+    scheduleCheck() {
+        clearTimeout(this.timer);
+        this.timer = setTimeout(() => this.check(), CONFIG.DUPLICATE_CHECK_DELAY);
+    },
+
+    check() {
+        try {
+            // [W3-FIX] 历史模式下跳过重复检测，只读行不应被高亮警告
+            if (AppState.system.isHistoryMode) return;
+            const now = Date.now();
+            
+            // 1. 清除旧的高亮
+            const oldWarnings = document.querySelectorAll('.duplicate-host-warning');
+            for (let i = 0; i < oldWarnings.length; i++) {
+                oldWarnings[i].classList.remove('duplicate-host-warning');
+            }
+
+            // hostNo -> { arrStations: Set, depStations: Set, elements: Array }
+            const hostMap = new Map(); 
+            
+            const appRoot = document.getElementById('main-app-container') || document;
+            const inputs = appRoot.querySelectorAll('.work-table tbody tr .row-input[data-key="hostNo"]');
+            
+            for (let i = 0; i < inputs.length; i++) {
+                const input = inputs[i];
+                const val = input.value.trim();
+                if (!val) continue;
+                
+                const table = input.closest('table');
+                if (!table) continue;
+                
+                const side = table.dataset.side; // 'arrival' or 'departure'
+                const station = table.dataset.station;
+                
+                if (!hostMap.has(val)) {
+                    hostMap.set(val, { arrStations: new Set(), depStations: new Set(), elements: [] });
+                }
+                
+                const entry = hostMap.get(val);
+                entry.elements.push(input);
+                
+                if (side === 'arrival') entry.arrStations.add(station);
+                if (side === 'departure') entry.depStations.add(station);
+            }
+
+            // 3. 分析冲突
+            const currentDuplicates = new Set();
+            
+            hostMap.forEach((data, hostNo) => {
+                let isConflict = false;
+                let msg = '';
+                
+                // 逻辑 A: 同一车站在同一时刻既发又到
+                // 优化：求交集
+                for (const s of data.arrStations) {
+                    if (data.depStations.has(s)) {
+                        isConflict = true;
+                        msg = `主机 ${hostNo} 在 ${s} 状态冲突 (既发又到)`;
+                        break;
+                    }
+                }
+                
+                // 逻辑 B: 同时到达多个不同车站
+                if (!isConflict && data.arrStations.size > 1) {
+                    isConflict = true;
+                    msg = `主机 ${hostNo} 同时到达多个车站 (${Array.from(data.arrStations).join('、')})`;
+                }
+                
+                // 逻辑 C: 同时从多个不同车站出发
+                if (!isConflict && data.depStations.size > 1) {
+                    isConflict = true;
+                    msg = `主机 ${hostNo} 同时从多个车站出发`;
+                }
+
+                if (isConflict) {
+                    const uniqueKey = `${hostNo}_CONFLICT`;
+                    currentDuplicates.add(uniqueKey);
+                    
+                    // 记录告警时间，防止弹窗刷屏
+                    if (!this._warningStartTimes.has(uniqueKey)) {
+                        this._warningStartTimes.set(uniqueKey, now);
+                        UI.toast(`⚠️ ${msg}`);
+                        Logger.warn(`[DuplicateCheck] ${msg}`);
+                    }
+                    
+                    // 高亮相关元素（冲突存在则持续高亮，直到冲突解除）
+                    data.elements.forEach(el => el.classList.add('duplicate-host-warning'));
+                }
+            });
+
+            // 4. 清理告警记录
+            // [SRE-FIX] 只要冲突还存在就保留记录（保持静音高亮），冲突消失才删除。
+            // 原逻辑 TTL=60s 会在冲突未解决时删掉记录，导致下次 check() 重新 toast，每分钟骚扰一次操作员
+            for (const [key] of this._warningStartTimes.entries()) {
+                if (!currentDuplicates.has(key)) {
+                    this._warningStartTimes.delete(key);
+                }
+            }
+            
+        } catch (e) {
+            Logger.error('Duplicate check failed', e);
+        }
+    }
+};
+
+/* ==================== 16. 渲染模块 ==================== */
+const RenderModule = {
+    renderStations() {
+        try {
+            const container = DOM.getElement(DOM_IDS.STATIONS_CONTAINER);
+            if (!container) return;
+            container.innerHTML = '';
+            AppState.config.stations.forEach(stationName => {
+                container.appendChild(this._createStationBlock(stationName));
+            });
+            DOMCache.refreshTables();
+            Logger.info('Stations rendered', { count: AppState.config.stations.length });
+        } catch (e) {
+            Logger.error('Render stations failed', e);
+        }
+    },
+
+    _createStationBlock(stationName) {
+        const block = document.createElement('div');
+        block.className = 'station-block';
+        block.setAttribute('data-name', stationName);
+        const safeName = Util.escapeHTML(stationName);
+        block.innerHTML = `
+            <div class="station-header">${safeName}</div>
+            <div class="station-split">
+                <div class="side-pane">
+                    <div class="side-title dep">出发</div>
+                    ${this._createTable(stationName, 'departure')}
+                </div>
+                <div class="side-pane">
+                    <div class="side-title arr">到达</div>
+                    ${this._createTable(stationName, 'arrival')}
+                </div>
+            </div>
+        `;
+        return block;
+    },
+
+    _createTable(station, side) {
+        const fields = side === 'departure' ? CONFIG.FIELDS.DEPARTURE : CONFIG.FIELDS.ARRIVAL;
+        const headerRow = fields.map(f => `<th>${f.l}</th>`).join('');
+        const bodyRows = Array.from({length: 6}, () => this._createTableRow(station, side, fields)).join('');
+        return `
+            <table class="work-table" data-station="${Util.escapeHTML(station)}" data-side="${side}"><!-- [Y2-FIX] escapeHTML防止站名含"时attribute截断导致DOMCache选取失败、数据静默丢失 -->
+                <thead><tr>${headerRow}</tr></thead>
+                <tbody>${bodyRows}</tbody>
+            </table>
+        `;
+    },
+
+    _createTableRow(station, side, fields) {
+        const cells = fields.map(f => {
+            if (f.t === 'select') {
+                const options = AppState.config.dropdowns
+                    .map(d => `<option value="${Util.escapeHTML(d)}">${Util.escapeHTML(d)}</option>`)
+                    .join('');
+                return `<td><select class="row-input std-select-box" data-key="${f.k}"><option value=""></option>${options}</select></td>`;
+            } else {
+                return `<td><input type="text" class="row-input" data-key="${f.k}" maxlength="100"></td>`;
+            }
+        }).join('');
+        return `<tr>${cells}</tr>`;
+    },
+
+    renderStats() {
+        try {
+            const namesRow  = DOM.getElement(DOM_IDS.STATS_ROW_NAMES);
+            const typesRow  = DOM.getElement(DOM_IDS.STATS_ROW_TYPES);
+            const valuesRow = DOM.getElement(DOM_IDS.STATS_ROW_VALUES);
+            if (!namesRow || !typesRow || !valuesRow) return;
+
+            let namesHTML  = `<th class="st-hd" style="width:80px;">车站</th>`;
+            let typesHTML  = `<th class="st-hd" style="width:80px;">统计项</th>`;
+            let valuesHTML = `<th class="st-hd" style="width:80px;">全站合计</th>`;
+
+            AppState.config.stations.forEach(s => {
+                const safeName = Util.escapeHTML(s);
+                const safeId   = Util.toId(s); // [T8-FIX] 使用 ID 安全版本，避免空格等非法字符
+                namesHTML  += `<th colspan="2" class="st-hd">${safeName}</th>`;
+                typesHTML  += `<td class="st-dep">出发</td><td class="st-arr">到达</td>`;
+                valuesHTML += `<td id="sc-dep-${safeId}" class="st-val">0</td><td id="sc-arr-${safeId}" class="st-val">0</td>`;
+            });
+
+            namesHTML  += `<th colspan="2" class="st-th">汇总合计</th>`;
+            typesHTML  += `<td class="st-ts">总出发</td><td class="st-ts">总到达</td>`;
+            valuesHTML += `<td id="total-all-dep" class="st-ts">0</td><td id="total-all-arr" class="st-ts">0</td>`;
+
+            namesRow.innerHTML  = namesHTML;
+            typesRow.innerHTML  = typesHTML;
+            valuesRow.innerHTML = valuesHTML;
+
+            Logger.info('Stats table rendered');
+        } catch (e) {
+            Logger.error('Render stats failed', e);
+        }
+    },
+
+    renderInventory() {
+        try {
+            const namesRow = DOM.getElement(DOM_IDS.INV_ROW_NAMES);
+            const valsRow  = DOM.getElement(DOM_IDS.INV_ROW_VALS);
+            if (!namesRow || !valsRow) return;
+
+            let namesHTML = '', valsHTML = '';
+            AppState.config.invStations.forEach(s => {
+                const safeName = Util.escapeHTML(s);
+                namesHTML += `<th class="st-hd">${safeName}</th>`;
+                valsHTML  += `<td><input type="number" class="inv-input" data-stat="${Util.escapeHTML(s)}" min="0" max="9999"></td>`; // [Y1-FIX] escapeHTML防止含"时attribute截断导致设备数量加载失败
+            });
+
+            namesRow.innerHTML = namesHTML;
+            valsRow.innerHTML  = valsHTML;
+
+            Logger.info('Inventory table rendered');
+        } catch (e) {
+            Logger.error('Render inventory failed', e);
+        }
+    }
+};
+
+/* ==================== 17. 表格交互模块 ==================== */
+const TableModule = {
+    initialized: false,
+    MAX_ROWS_PER_TABLE: 500,       // [HIGH-5 FIX] 放宽上限至500，i5-12代支撑无压力，防止高峰期锁死录入
+    MAX_CLEANUP_THRESHOLD: 100,    // 超过100空行时清理，避免频繁DOM重排
+    _cachedOptionsVersion: null,
+    _cachedOptions: null,
+
+    _getOptions() {
+        const currentVersion = AppState.config.dropdowns.join(',');
+        if (this._cachedOptionsVersion !== currentVersion) {
+            this._cachedOptionsVersion = currentVersion;
+            this._cachedOptions = '<option value=""></option>' +
+                AppState.config.dropdowns.map(d =>
+                    `<option value="${Util.escapeHTML(d)}">${Util.escapeHTML(d)}</option>`
+                ).join('');
+        }
+        return this._cachedOptions;
+    },
+
+    init() {
+        if (this.initialized) return;
+        const container = DOM.getElement(DOM_IDS.MAIN_CONTAINER);
+        if (!container) return;
+        const self = this;
+
+        container.addEventListener('compositionstart', () => { AppState.system.isComposing = true; });
+        container.addEventListener('compositionend', (e) => {
+            AppState.system.isComposing = false;
+            if (e.target && e.target.matches('.row-input, .inv-input, .ret-input')) {
+                self.onCellInput(e.target);
+            }
+        });
+
+        container.addEventListener('input', (e) => {
+            if (AppState.system.isComposing) return;
+            const t = e.target;
+            // [冗余点3 FIX] 合并两个重复的 input 监听器为一个，逻辑不变
+            if (t.matches('.row-input, .inv-input, .ret-input')) {
+                self.onCellInput(t);
+            } else if (t.matches('.ret-detail, .ret-num')) {
+                if (!AppState.system.isHistoryMode) {
+                    StatsModule.update();
+                    AppActions.triggerAutoSave();
+                    AppState.data.modified = true;
+                    ReturnModule.checkAutoRow();
+                }
+            }
+        });
+
+        container.addEventListener('change', (e) => {
+            if (e.target.matches('select.row-input')) self.onCellInput(e.target);
+            if (e.target.matches('.ret-f-stat, .ret-t-stat')) {
+                if (!AppState.system.isHistoryMode) {
+                    StatsModule.update();
+                    AppActions.triggerAutoSave();
+                    AppState.data.modified = true;
+                    ReturnModule.checkAutoRow();
+                }
+            }
+        });
+
+        container.addEventListener('paste', (e) => {
+            if (!e.target.matches('.row-input')) return;
+            const text = (e.clipboardData || window.clipboardData).getData('text');
+            if (!text.includes('\t') && !text.includes('\n')) return;
+            e.preventDefault();
+            const allRows = text.split(/\r?\n/).filter(r => r.trim());
+            // [HIGH-PASTE FIX] 限制单次粘贴行数，防止超大粘贴卡死 UI 和撑爆 IPC
+            const MAX_PASTE_ROWS = 50;
+            const rows = allRows.slice(0, MAX_PASTE_ROWS);
+            if (allRows.length > MAX_PASTE_ROWS) {
+                UI.toast(`⚠️ 粘贴内容超过 ${MAX_PASTE_ROWS} 行，已自动截断`);
+            }
+            const currentTr = e.target.closest('tr');
+            if (!currentTr) return;
+            const currentTd = e.target.closest('td');
+            const cells = Array.from(currentTr.querySelectorAll('td'));
+            const startColIdx = cells.indexOf(currentTd);
+            let trCursor = currentTr;
+            // [PASTE-LOCK FIX] 粘贴期间挂起 onCellInput 的行数清理/扩容，
+            // 防止 _removeEmptyRows 删行导致 trCursor.nextElementSibling 失效，后续数据丢失
+            AppState.system.isPasting = true;
+            try {
+            rows.forEach(rowStr => {
+                if (!trCursor) return;
+                const cols = rowStr.split('\t');
+                const inputs = Array.from(trCursor.querySelectorAll('.row-input'));
+                cols.forEach((val, ci) => {
+                    const targetInput = inputs[startColIdx + ci];
+                    if (targetInput && targetInput.tagName === 'INPUT') {
+                        targetInput.value = val.trim().slice(0, 100); // 同步 maxlength
+                        targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                });
+                trCursor = trCursor.nextElementSibling;
+            });
+            if (allRows.length <= MAX_PASTE_ROWS) {
+                UI.toast(`✅ 已自动填充 ${rows.length} 行 Excel 数据`);
+            }
+            } finally {
+                AppState.system.isPasting = false;
+                // 粘贴结束后，一次性补全空行缓冲，确保表格末尾有行可继续录入
+                const tbody = currentTr.closest('tbody');
+                if (tbody) {
+                    const tableEl = tbody.closest('table');
+                    const station = tableEl?.dataset.station;
+                    const side    = tableEl?.dataset.side;
+                    if (station && side) DataModule._ensureEmptyBuffer(tbody, station, side, 2);
+                }
+            }
+        });
+
+        this.initialized = true;
+        Logger.info('TableModule initialized');
+    },
+
+        onCellInput(el) {
+        try {
+            if (AppState.system.isHistoryMode) { UI.toast("⚠️ 历史模式"); return; }
+            AppState.data.modified = true;
+
+            const row   = el.closest('tr');
+            if (!row) return;
+            const tbody = row.parentElement;
+            const table = row.closest('.work-table');
+            if (!table) return;
+
+            const side  = table.dataset.side;
+            const block = row.closest('.station-block');
+
+            if (block) {
+                const station = block.dataset.name;
+                const lastRow       = tbody.lastElementChild;
+                const secondLastRow = lastRow ? lastRow.previousElementSibling : null;
+
+                // [R20-FIX] 排除参考行，与 _addRows 中的计数逻辑保持一致
+                const currentRows = tbody.querySelectorAll('tr:not(.history-ref-row)').length;
+
+                // [MEDIUM-C FIX] 使用 TableModule 属性替换局部 const
+                // [PASTE-LOCK FIX] 粘贴期间跳过行数清理，防止 trCursor 游标失效
+                if (!AppState.system.isPasting && currentRows >= this.MAX_CLEANUP_THRESHOLD) this._removeEmptyRows(tbody, 5);
+
+                if (currentRows >= this.MAX_ROWS_PER_TABLE) {
+                    console.warn(`Station ${station} reached hard limit ${this.MAX_ROWS_PER_TABLE}`);
+                    return; 
+                }
+
+                if (this._rowHasData(lastRow)) {
+                    this._addRows(tbody, station, side);
+                    this._addRows(tbody, station, side);
+                } else if (this._rowHasData(secondLastRow)) {
+                    this._addRows(tbody, station, side);
+                }
+            }
+
+            StatsModule.update();
+            AppActions.triggerAutoSave();
+        } catch (e) {
+            Logger.error('Cell input failed', e);
+        }
+    },
+
+    _rowHasData(tr) {
+        if (!tr || tr.classList.contains('history-ref-row')) return false;
+        return Array.from(tr.querySelectorAll('.row-input')).some(i => i.value && i.value.trim() !== '');
+    },
+
+    _removeEmptyRows(tbody, count = 10) {
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        let removed = 0;
+        for (let i = rows.length - 1; i >= 0 && removed < count; i--) {
+            const row = rows[i];
+            if (!this._rowHasData(row) && !row.classList.contains('history-ref-row')) {
+                row.remove();
+                removed++;
+            }
+        }
+        if (removed > 0) Logger.info(`Removed ${removed} empty rows`);
+    },
+
+    _addRows(tbody, station, side) {
+        try {
+            const currentRows = Array.from(tbody.rows).filter(r => !r.classList.contains('history-ref-row')).length;
+            if (currentRows >= this.MAX_ROWS_PER_TABLE) {
+                // 只有真的到了 500 行才提示，平时完全无感
+                UI.toast(`⚠️ 单站记录已达 ${this.MAX_ROWS_PER_TABLE} 行上限，建议交班`);
+                return;
+            }
+
+            const fields = side === 'departure' ? CONFIG.FIELDS.DEPARTURE : CONFIG.FIELDS.ARRIVAL;
+            // [CRITICAL-05] 使用版本戳缓存，随配置变更自动重建
+            const cachedOpts = this._getOptions();
+
+            const cellsHtml = fields.map(f => {
+                if (f.t === 'select') {
+                    return `<td><select class="row-input std-select-box" data-key="${f.k}">${cachedOpts}</select></td>`;
+                } else {
+                    return `<td><input type="text" class="row-input" data-key="${f.k}" maxlength="100"></td>`;
+                }
+            }).join('');
+
+            tbody.insertAdjacentHTML('beforeend', `<tr>${cellsHtml}</tr>`);
+        } catch (e) {
+            Logger.error('Add rows failed', e);
+        }
+    }
+};
+
+/* ==================== 18. 统计模块 ==================== */
+const StatsModule = {
+    _updateTimer: null,
+
+    update() {
+        clearTimeout(this._updateTimer);
+        this._updateTimer = setTimeout(() => this._doUpdate(), 300);
+    },
+
+    _doUpdate() {
+        try {
+            let totalArr = 0, totalDep = 0;
+            AppState.config.stations.forEach(s => {
+                const { arrival, departure } = this._countStation(s);
+                const safeId = Util.toId(s); // [T8-FIX] 与 renderStats 保持一致
+                DOM.setText(`sc-arr-${safeId}`, arrival);
+                DOM.setText(`sc-dep-${safeId}`, departure);
+                totalArr += arrival;
+                totalDep += departure;
+            });
+            DOM.setText('total-all-arr', totalArr);
+            DOM.setText('total-all-dep', totalDep);
+            this._updateInventorySum();
+        } catch (e) {
+            Logger.error('Stats update failed', e);
+        }
+    },
+
+    _countStation(station) {
+        try {
+            let arrival = 0, departure = 0;
+            const arrTable = DOMCache.getTable(station, 'arrival');
+            const depTable = DOMCache.getTable(station, 'departure');
+            if (arrTable) {
+                // [S11-FIX] 排除参考行，防止上班参考数据被计入本班统计
+                arrTable.querySelectorAll('tbody tr:not(.history-ref-row)').forEach(tr => {
+                    const host = tr.querySelector('[data-key="hostNo"]')?.value || "";
+                    if (host.trim() !== "" && !tr.classList.contains('is-handover-data')) arrival++;
+                });
+            }
+            if (depTable) {
+                depTable.querySelectorAll('tbody tr:not(.history-ref-row)').forEach(tr => {
+                    const host = tr.querySelector('[data-key="hostNo"]')?.value || "";
+                    if (host.trim() !== "" && !tr.classList.contains('is-handover-data')) departure++;
+                });
+            }
+            return { arrival, departure };
+        } catch (e) {
+            Logger.error(`Count station ${station} failed`, e);
+            return { arrival: 0, departure: 0 };
+        }
+    },
+
+    _updateInventorySum() {
+        try {
+            let sum = 0;
+            DOM.queryAll('.inv-input').forEach(input => {
+                const val = Util.safeInt(input.value, 0);
+                if (val >= 0) sum += val;
+            });
+            DOM.setText(DOM_IDS.INV_TOTAL_SUM, `总计: ${sum}`);
+        } catch (e) {
+            Logger.error('Update inventory sum failed', e);
+        }
+    }
+};
+
+/* ==================== 19. 纯函数：数据提取与验证 ==================== */
+const DataPureFunctions = {
+    // [W2-FIX] 删除 filterValidRows 死代码（字段名拼写错误 isHandover→_isHandover，且从未被调用）
+
+    // [CRITICAL-03/04] 增强校验：时间戳范围 + notes类型
+    validateDataSchema(data) {
+        try {
+            if (!data || typeof data !== 'object') return false;
+            if (!data.version) return false;
+            if (!/^\d{4}\./.test(data.version)) return false;
+
+            // 只校验 timestamp 是数字类型，不做范围判断：避免误杀合法旧班数据
+            if (typeof data.timestamp !== 'number') return false;
+
+            if (!data.stations || typeof data.stations !== 'object') return false;
+            for (const stName in data.stations) {
+                const st = data.stations[stName];
+                if (!st || typeof st !== 'object') return false;
+                if (!Array.isArray(st.arrival) || !Array.isArray(st.departure)) return false;
+            }
+
+            // notes 类型校验 [R14-FIX] 向后兼容：不存在则接受（旧版数据可能缺字段），存在则校验类型
+            // [W20-FIX] 原逻辑强制要求 notes 存在，导致旧版无 notes 数据升级时被拒绝，数据丢失
+            if (data.notes !== undefined) {
+                if (typeof data.notes !== 'object' || data.notes === null) return false;
+                for (const k of ['imp', 'safe', 'hand']) {
+                    if (data.notes[k] !== undefined && typeof data.notes[k] !== 'string') return false;
+                }
+            }
+
+            // [X1-FIX] inv/rets 向后兼容：缺失时接受（旧版数据），存在时校验类型
+            if (data.inv !== undefined && (typeof data.inv !== 'object' || data.inv === null)) return false;
+            if (data.rets !== undefined && !Array.isArray(data.rets)) return false;
+
+            return true;
+        } catch (e) {
+            return false;
+        }
+    },
+
+    rolloverDepartureRows(departureRows) {
+        return departureRows
+            .filter(row => !row.toStation || row.toStation.trim() === '')
+            .map(row => ({ ...row, _isHandover: true }));
+    }
+};
+
+/* ==================== 20. 数据序列化模块 ==================== */
+const DataModule = {
+
+    collectCurrentDataSync(opts = {}) {
+        const data = {
+            version: CONFIG.VERSION,
+            timestamp: Date.now(),
+            duty: DOM.getValue ? DOM.getValue(DOM_IDS.DUTY_SELECTOR) : '',
+            stations: {},
+            notes: {
+                imp:  Util.truncate(DOM.getValue ? DOM.getValue(DOM_IDS.NOTE_IMPORTANT) : '', 500),
+                safe: Util.truncate(DOM.getValue ? DOM.getValue(DOM_IDS.NOTE_SAFETY)    : '', 500),
+                hand: Util.truncate(DOM.getValue ? DOM.getValue(DOM_IDS.NOTE_HANDOVER)  : '', 500)
+            },
+            inv: {},
+            rets: []
+        };
+        if (opts.isEmergency) data._emergencySave = true;
+        if (AppState.config && AppState.config.stations) {
+            AppState.config.stations.forEach(s => {
+                data.stations[s] = {
+                    arrival:   this._collectTableData(s, 'arrival'),
+                    departure: this._collectTableData(s, 'departure')
+                };
+            });
+        }
+        try {
+            DOM.queryAll('.inv-input').forEach(input => {
+                const stat = input.dataset.stat;
+                if (stat) data.inv[stat] = Util.safeInt(input.value, 0);
+            });
+        } catch (e) {}
+        try { data.rets = this._collectReturnData(); } catch (e) {}
+        return data;
+    },
+
+    async getCurrentData() {
+        try {
+            const data = this.collectCurrentDataSync();
+            if (typeof JSON !== 'undefined') {
+                const approxBytes = JSON.stringify(data).length * 2;
+                if (approxBytes > CONFIG.WARN_WRITE_SIZE_BYTES) {
+                    Logger.warn(`Data size: ${Math.round(approxBytes/1024)}KB — consider reducing rows`);
+                }
+            }
+            return data;
+        } catch (e) {
+            Logger.error('Get current data failed', e);
+            return null;
+        }
+    },
+
+    _sanitizeInput(str, maxLen = 100) {
+        if (!str) return '';
+        // [HIGH-SCAN FIX] 清除 ASCII 控制字符（含扫码枪输出的 \r\n\t 和不可见控制符）
+        // 防止 "A001\r" !== "A001" 导致对账失败，以及 JSON 跨系统对接损坏
+        // [IME-FIX] JS 硬截断：中文拼音输入法在 composing 状态可突破 HTML maxlength 属性，
+        // 必须在数据收集层再做一次强制截断，确保写盘数据不超长
+        return str.trim()
+            .replace(/[\x00-\x1F\x7F]/g, '')      // ASCII 控制字符（含 \r \n \t）
+            .replace(/[\u200b-\u200f\u2028\u2029\uFEFF\u00AD]/g, '') // 零宽/软连字符
+            .substring(0, maxLen);                   // 硬截断，IME 无法绕过
+    },
+
+    _collectTableData(station, side) {
+        try {
+            const rows = [];
+            const table = DOMCache.getTable(station, side);
+            if (!table) return rows;
+            const tbody = table.querySelector('tbody');
+            if (!tbody) return rows;
+            tbody.querySelectorAll('tr:not(.history-ref-row)').forEach(tr => {
+                const rowData = {};
+                let hasData = false;
+                tr.querySelectorAll('.row-input').forEach(input => {
+                    const key = input.dataset.key;
+                    if (key) {
+                        const value = this._sanitizeInput(input.value);
+                        rowData[key] = value;
+                        if (value) hasData = true;
+                    }
+                });
+                if (hasData) {
+                    rowData._isHandover = tr.classList.contains('is-handover-data');
+                    rows.push(rowData);
+                }
+            });
+            return rows;
+        } catch (e) {
+            Logger.error(`Collect table data failed for ${station}/${side}`, e);
+            return [];
+        }
+    },
+
+    _collectReturnData() {
+        try {
+            const rets = [];
+            const tbody = DOM.getElement(DOM_IDS.RETURN_TBODY);
+            if (!tbody) return rets;
+            tbody.querySelectorAll('tr').forEach(tr => {
+                const fStat  = tr.querySelector('.ret-f-stat')?.value  || '';
+                const detail = tr.querySelector('.ret-detail')?.value  || '';
+                const tStat  = tr.querySelector('.ret-t-stat')?.value  || '';
+                const num    = Util.safeInt(tr.querySelector('.ret-num')?.value, 0);
+                if (fStat || detail || num > 0) {
+                    rets.push({
+                        f: Util.truncate(fStat, 50),
+                        v: Util.truncate(detail, 200),
+                        t: Util.truncate(tStat, 50),
+                        n: num,
+                        _isHandover: tr.classList.contains('is-handover-data')
+                    });
+                }
+            });
+            return rets;
+        } catch (e) {
+            Logger.error('Collect return data failed', e);
+            return [];
+        }
+    },
+
+    async loadData(data, { skipStationRecovery = false } = {}) {
+        try {
+            if (!data) return false;
+            if (!DataPureFunctions.validateDataSchema(data)) {
+                Logger.error('Invalid data schema');
+                return false;
+            }
+            if (data.duty) {
+                DOM.setValue(DOM_IDS.DUTY_SELECTOR, data.duty);
+                AppState.data.currentDuty = data.duty;
+            }
+
+            const prevBackup = await (async () => {
+                try {
+                    // [X9-FIX] PREVIOUS_BACKUP 始终以普通对象存储，_unwrap 路径永远不触发，直接返回原值
+                    const raw = await Storage.get(CONFIG.KEYS.PREVIOUS_BACKUP);
+                    return raw || null;
+                } catch (e) {
+                    console.warn('Failed to load previous backup', e);
+                    return null;
+                }
+            })();
+
+            if (data.stations) {
+                // [FATAL-2 FIX] 配置损坏重置为默认后，主数据可能含有非默认车站。
+                // 若不注回，DOMCache.getTable 返回 null，数据不渲染，
+                // 下次 autoSave 只收集已渲染车站，未渲染车站数据被静默覆写丢失。
+                // [DEL-STATION FIX] skipStationRecovery=true 时跳过注回：
+                // 用户主动删除车站后保存配置，settingsBackup 里仍含旧车站数据，
+                // 若不跳过，被删车站会被重新注回 AppState.config.stations，导致删除无效。
+                let needRerender = false;
+                if (!skipStationRecovery) {
+                    Object.keys(data.stations).forEach(stationName => {
+                        if (!AppState.config.stations.includes(stationName)) {
+                            AppState.config.stations.push(stationName);
+                            if (!AppState.config.dropdowns.includes(stationName)) {
+                                AppState.config.dropdowns.push(stationName);
+                            }
+                            needRerender = true;
+                            Logger.warn(`[Data Recovery] 配置遗失车站已强制恢复: ${stationName}`);
+                        }
+                    });
+                }
+                if (needRerender) {
+                    // 重新渲染补全缺失的 DOM 节点，刷新 DOMCache 使 getTable 能命中
+                    RenderModule.renderStations();
+                    DOMCache.refreshTables();
+                }
+                Object.entries(data.stations).forEach(([station, tables]) => {
+                    if (tables.arrival)   this._loadTableData(station, 'arrival',   tables.arrival,   prevBackup);
+                    if (tables.departure) this._loadTableData(station, 'departure', tables.departure, null);
+                });
+            }
+            if (data.notes) {
+                DOM.setValue(DOM_IDS.NOTE_IMPORTANT, data.notes.imp  || '');
+                DOM.setValue(DOM_IDS.NOTE_SAFETY,    data.notes.safe || '');
+                DOM.setValue(DOM_IDS.NOTE_HANDOVER,  data.notes.hand || '');
+            }
+            if (data.inv) {
+                Object.entries(data.inv).forEach(([stat, val]) => {
+                    // [Y1-FIX] data-stat attribute 已转义，selector 中 stat 值同样需转义以正确匹配
+                    const input = document.querySelector(`.inv-input[data-stat="${Util.escapeHTML(stat)}"]`);
+                    if (input) input.value = val;
+                });
+            }
+            if (data.rets) this._loadReturnData(data.rets);
+            StatsModule.update();
+            if (typeof DuplicateCheckModule !== 'undefined' && DuplicateCheckModule.rebuildIndex) {
+                DuplicateCheckModule.rebuildIndex();
+            }
+            Logger.info('Data loaded successfully');
+            return true;
+        } catch (e) {
+            Logger.error('Load data failed', e);
+            return false;
+        }
+    },
+
+    _loadTableData(station, side, rowsData, prevBackup) {
+        try {
+            const table = DOMCache.getTable(station, side);
+            if (!table) return;
+            const tbody = table.querySelector('tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (side === 'arrival' && !AppState.system.isHistoryMode && prevBackup) {
+                this._appendHistoryReference(tbody, station, prevBackup);
+            }
+
+            if (Array.isArray(rowsData) && rowsData.length > 0) {
+                const fields = side === 'departure' ? CONFIG.FIELDS.DEPARTURE : CONFIG.FIELDS.ARRIVAL;
+                const opts   = TableModule._getOptions();
+
+                // 第一步：批量生成所有行HTML（纯字符串，零DOM访问）
+                const rowsHtml = rowsData.map(() => {
+                    const cells = fields.map(f =>
+                        f.t === 'select'
+                            ? `<td><select class="row-input std-select-box" data-key="${f.k}">${opts}</select></td>`
+                            : `<td><input type="text" class="row-input" data-key="${f.k}"></td>`
+                    ).join('');
+                    return `<tr>${cells}</tr>`;
+                }).join('');
+
+                // 第二步：一次性插入（触发一次布局，而非N次）
+                tbody.insertAdjacentHTML('beforeend', rowsHtml);
+
+                // 第三步：按索引填值，并处理交班标记
+                const newRows = tbody.querySelectorAll('tr:not(.history-ref-row)');
+                rowsData.forEach((rowData, idx) => {
+                    const tr = newRows[idx];
+                    if (!tr || !rowData) return;
+                    let isHandover = false;
+                    Object.entries(rowData).forEach(([key, value]) => {
+                        if (key === '_isHandover') { if (value) isHandover = true; return; }
+                        const input = tr.querySelector(`[data-key="${key}"]`);
+                        if (!input) return;
+                        if (input.tagName === 'SELECT' && value) {
+                            // [SELECT-GHOST FIX] select.value 赋值在 option 不存在时静默失败，
+                            // 数据显示为空，下次保存时该字段丢失。
+                            // 动态注入遗留 option 并标记警告色保全数据，提示管理员站名已变更。
+                            const exists = Array.from(input.options).some(o => o.value === String(value));
+                            if (!exists) {
+                                const ghost = document.createElement('option');
+                                ghost.value = String(value);
+                                ghost.textContent = `⚠️${value}(已删)`;
+                                ghost.style.color = '#dc2626';
+                                input.appendChild(ghost);
+                            }
+                        }
+                        input.value = value;
+                    });
+                    if (isHandover) {
+                        tr.classList.add('is-handover-data');
+                        tr.querySelectorAll('.row-input').forEach(i => i.classList.add('is-handover-data'));
+                    }
+                });
+            } else if (!Array.isArray(rowsData)) {
+                Logger.warn(`Invalid rowsData for ${station} ${side}`, rowsData);
+            }
+
+            this._ensureEmptyBuffer(tbody, station, side, 2);
+        } catch (e) {
+            Logger.error(`Load table data failed for ${station}/${side}`, e);
+        }
+    },
+
+    _appendHistoryReference(tbody, station, prevBackupObj) {
+        try {
+            if (!prevBackupObj) return;
+
+            const dataRoot = prevBackupObj.payload || prevBackupObj;
+            
+            if (!dataRoot || !dataRoot.stations) return;
+            
+            const prevStationData = dataRoot.stations[station];
+            if (!prevStationData?.arrival?.length) return;
+
+            // [U14-FIX] 跳过交班结转行，只取实际到达的最后一条作为参考
+            const candidates = prevStationData.arrival.filter(r => !r._isHandover && r.hostNo);
+            if (!candidates.length) return;
+            const lastRowData = candidates[candidates.length - 1];
+
+            const cells = CONFIG.FIELDS.ARRIVAL.map(f =>
+                `<td>${Util.escapeHTML(String(lastRowData[f.k] || ''))}</td>`
+            ).join('');
+            tbody.insertAdjacentHTML('afterbegin',
+                `<tr class="history-ref-row" title="上一班最后一条到达记录 (参考)">${cells}</tr>`
+            );
+        } catch (e) {
+            console.warn('History reference load error:', e);
+        }
+    },
+
+    _ensureEmptyBuffer(tbody, station, side, bufferCount) {
+        let emptyCount = 0;
+        for (let i = tbody.rows.length - 1; i >= 0; i--) {
+            const tr = tbody.rows[i];
+            if (tr.classList.contains('history-ref-row')) continue;
+            const inputs  = Array.from(tr.querySelectorAll('.row-input'));
+            const hasData = inputs.some(input => input.value && input.value.trim() !== '');
+            if (!hasData) { emptyCount++; } else { break; }
+        }
+        const needed = bufferCount - emptyCount;
+        for (let k = 0; k < needed; k++) TableModule._addRows(tbody, station, side);
+    },
+
+    _loadReturnData(retsData) {
+        try {
+            const tbody = DOM.getElement(DOM_IDS.RETURN_TBODY);
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            retsData.forEach(ret => {
+                const tr = document.createElement('tr');
+                if (ret._isHandover) tr.classList.add('is-handover-data');
+                tr.innerHTML = ReturnModule._createRowHTML(ret);
+                tbody.appendChild(tr);
+            });
+            if (tbody.rows.length === 0) ReturnModule.addRow();
+            if (ReturnModule.checkAutoRow) ReturnModule.checkAutoRow();
+        } catch (e) {
+            Logger.error('Load return data failed', e);
+        }
+    }
+};
+
+/* ==================== 21. 回送表模块 ==================== */
+const ReturnModule = {
+    async init() {
+        try {
+            const tbody = DOM.getElement(DOM_IDS.RETURN_TBODY);
+            if (!tbody) return;
+            if (tbody.rows.length === 0) this.addRow();
+            this.checkAutoRow();
+            Logger.info('Return module initialized');
+        } catch (e) {
+            Logger.error('Return module init failed', e);
+        }
+    },
+
+    _createRowHTML(ret = {}) {
+        const makeOptions = (selected) =>
+            AppState.config.stations.map(s =>
+                `<option value="${Util.escapeHTML(s)}" ${s === selected ? 'selected' : ''}>${Util.escapeHTML(s)}</option>`
+            ).join('');
+        return `
+            <td><select class="ret-f-stat std-select-box">
+                <option value=""></option>${makeOptions(ret.f)}
+            </select></td>
+            <td><input type="text" class="ret-detail" value="${Util.escapeHTML(ret.v || '')}"></td>
+            <td><select class="ret-t-stat std-select-box">
+                <option value=""></option>${makeOptions(ret.t)}
+            </select></td>
+            <td><input type="number" class="ret-num" min="1" max="99" value="${ret.n != null && ret.n !== '' ? ret.n : ''}"></td>
+            <td><button class="btn btn-prev" style="font-size:12px; padding:4px 8px;" onclick="ReturnModule.removeRow(this)">删除</button></td>
+        `;
+    },
+
+    addRow() {
+        try {
+            const tbody = DOM.getElement(DOM_IDS.RETURN_TBODY);
+            if (!tbody) return;
+            const tr = document.createElement('tr');
+            tr.innerHTML = this._createRowHTML();
+            tbody.appendChild(tr);
+        } catch (e) {
+            Logger.error('Add return row failed', e);
+        }
+    },
+
+    checkAutoRow() {
+        const tbody = DOM.getElement(DOM_IDS.RETURN_TBODY);
+        if (!tbody) return;
+        const lastRow = tbody.lastElementChild;
+        if (lastRow && this._hasData(lastRow)) this.addRow();
+        while (tbody.rows.length > 1) {
+            const last = tbody.lastElementChild;
+            const prev = last.previousElementSibling;
+            if (last && prev && !this._hasData(last) && !this._hasData(prev)) {
+                last.remove();
+            } else { break; }
+        }
+    },
+
+    // [ES6+] 简化为 some 链式调用
+    _hasData(tr) {
+        return ['.ret-f-stat', '.ret-detail', '.ret-t-stat', '.ret-num']
+            .some(sel => !!tr.querySelector(sel)?.value?.trim());
+    },
+
+    removeRow(btn) {
+        try {
+            const tr = btn.closest('tr');
+            if (!tr) return;
+            const tbody = tr.parentElement;
+            if (this._hasData(tr)) {
+                Modal.show({
+                    title: '⚠️ 确认删除',
+                    content: '已填写回送内容，确定要删除这一行吗？',
+                    onConfirm: () => this._doRemoveRow(tr, tbody)
+                });
+                return;
+            }
+            this._doRemoveRow(tr, tbody);
+        } catch (e) {
+            Logger.error('Remove return row failed', e);
+        }
+    },
+
+    _doRemoveRow(tr, tbody) {
+        const focusInheritor = (() => {
+            const colIndex = Array.from(tr.children).findIndex(td => td.contains(document.activeElement));
+            const findInput = (targetTr) => {
+                if (!targetTr) return null;
+                const tds = Array.from(targetTr.children);
+                const td = tds[colIndex] || tds[0];
+                return td ? td.querySelector('input, select') : null;
+            };
+            return findInput(tr.nextElementSibling) || findInput(tr.previousElementSibling);
+        })();
+        if (tbody.rows.length <= 1) {
+            tr.querySelectorAll('input, select').forEach(el => el.value = '');
+        } else {
+            tr.remove();
+        }
+        if (focusInheritor) setTimeout(() => focusInheritor.focus(), 0);
+        this.checkAutoRow();
+        StatsModule.update();
+        AppActions.triggerAutoSave();
+    }
+}; // ReturnModule 结束
+
+/* ==================== 22. 对账模块 ==================== */
+const ReconcileModule = {
+    async reconcile() {
+        try {
+            let matched = 0, unmatched = 0;
+            const depIndex = new Map();
+            // [U13-FIX] 排除 history-ref-row，上班参考数据不参与本班对账
+            DOM.queryAll('.work-table[data-side="departure"] tbody tr:not(.history-ref-row)').forEach(tr => {
+                const host = tr.querySelector('[data-key="hostNo"]')?.value?.trim();
+                if (host) {
+                    const toStation = tr.querySelector('[data-key="toStation"]')?.value;
+                    if (!toStation || !depIndex.has(host)) {
+                        depIndex.set(host, { row: tr, station: tr.closest('.station-block')?.dataset.name });
+                    }
+                }
+            });
+            // [U13-FIX] 到达表同样排除 history-ref-row
+            DOM.queryAll('.work-table[data-side="arrival"] tbody tr:not(.history-ref-row)').forEach(arrRow => {
+                const host = arrRow.querySelector('[data-key="hostNo"]')?.value?.trim();
+                if (!host) return;
+                const hasData = arrRow.querySelector('[data-key="trainNo"]')?.value?.trim();
+                if (hasData) return; // 已有车次，跳过（不计入未匹配，行已完整）
+                if (depIndex.has(host)) {
+                    const depData    = depIndex.get(host);
+                    const depRow     = depData.row;
+                    const depStation = depData.station;
+                    const arrStation = arrRow.closest('.station-block')?.dataset.name;
+                    if (depStation === arrStation) {
+                        unmatched++; // [X2-FIX] 同站冲突行计入未匹配，而非静默跳过
+                        return;
+                    }
+                    // [MED-RECONCILE FIX] JS 直接赋值不触发 input/change 事件，
+                    // DuplicateCheckModule 依赖 input 事件，必须手动触发
+                    const _fireInput = (el) => el && el.dispatchEvent(new Event('input', { bubbles: true }));
+                    ['trainNo', 'locoNo', 'battNo'].forEach(key => {
+                        const val   = depRow.querySelector(`[data-key="${key}"]`)?.value;
+                        const input = arrRow.querySelector(`[data-key="${key}"]`);
+                        if (input && !input.value && val) { input.value = val; _fireInput(input); }
+                    });
+                    const fromStation = arrRow.querySelector('[data-key="fromStation"]');
+                    if (fromStation && !fromStation.value) { fromStation.value = depStation; _fireInput(fromStation); }
+                    const toStation = depRow.querySelector('[data-key="toStation"]');
+                    if (toStation && !toStation.value) { toStation.value = arrStation; _fireInput(toStation); }
+                    matched++;
+                } else {
+                    unmatched++;
+                }
+            });
+            StatsModule.update();
+            AppActions.triggerAutoSave();
+            // [X7-FIX] 对账填值后触发行管理，确保每个到达表末尾有空行可继续录入
+            DOM.queryAll('.work-table[data-side="arrival"]').forEach(table => {
+                const tbody = table.querySelector('tbody');
+                const station = table.dataset.station;
+                if (tbody && station) DataModule._ensureEmptyBuffer(tbody, station, 'arrival', 2);
+            });
+            Modal.show({
+                title: '对账完成',
+                content: `⚡ 高速比对完毕：自动关联 ${matched} 条，剩余 ${unmatched} 条未匹配。`
+            });
+        } catch (e) {
+            Logger.error('Reconcile failed', e);
+        }
+    }
+};
+
+/* ==================== 23. 历史模块 ==================== */
+const HistoryModule = {
+    async open() {
+        try {
+            const histories = await this._getHistories();
+
+            let html = '<div id="history-list" style="max-height: 500px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding: 2px;">';
+
+            if (histories.length === 0) {
+                html += '<div style="text-align: center; padding: 40px; color: #718096;">暂无历史记录</div>';
+            } else {
+                histories.forEach(h => {
+                    const isDay  = h.shift === '白班';
+                    const icon   = isDay ? '🌞' : '🌙';
+                    const bg     = isDay ? '#fffaf0' : '#f7fafc';
+                    const border = isDay ? '#fbd38d' : '#e2e8f0';
+                    // [MEDIUM-E FIX] 使用 data-history-key 属性，消除 onclick 字符串拼接 XSS 风险
+                    html += `
+                        <div data-history-key="${Util.escapeHTML(h.key)}" style="
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            background: ${bg};
+                            border: 1px solid ${border};
+                            border-radius: 4px;
+                            padding: 0 10px;
+                            cursor: pointer;
+                            height: 38px;
+                            flex-shrink: 0;
+                            font-size: 14px;
+                            white-space: nowrap;">
+                            <div style="font-weight: 600; color: #2d3748; display: flex; align-items: center;">
+                                <span style="margin-right: 8px;">${h.dateStr}</span>
+                                <span style="font-size: 12px; background: rgba(0,0,0,0.05); padding: 2px 8px; border-radius: 12px; display: inline-flex; align-items: center; height: 20px; line-height: 1;">
+                                    ${icon} ${h.shift}
+                                </span>
+                            </div>
+                            <div style="color: #718096; font-family: 'Consolas', monospace; font-size: 13px;">
+                                ${h.timeStr} 交班
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            html += '</div>';
+
+            Modal.show({
+                title: `📅 历史记录 (${histories.length}条)`,
+                content: html,
+                isHTML: true   // [NEW-9b] 明确声明此内容为受信任的 HTML（由内部代码生成，已转义用户数据）
+            });
+
+            // [MEDIUM-E FIX] 事件委托：Modal 渲染完成后绑定，比 onclick 属性更安全
+            setTimeout(() => {
+                const listEl = document.getElementById('history-list');
+                if (!listEl) return;
+                listEl.addEventListener('click', (e) => {
+                    const item = e.target.closest('[data-history-key]');
+                    if (!item) return;
+                    const key = item.dataset.historyKey;
+                    if (key) HistoryModule.loadHistory(key);
+                });
+                listEl.addEventListener('mouseover', (e) => {
+                    const item = e.target.closest('[data-history-key]');
+                    if (item) item.style.filter = 'brightness(0.95)';
+                });
+                listEl.addEventListener('mouseout', (e) => {
+                    const item = e.target.closest('[data-history-key]');
+                    if (item) item.style.filter = '';
+                });
+            }, 0);
+        } catch (e) {
+            Logger.error('Open history failed', e);
+            UI.toast('❌ 无法读取历史记录');
+        }
+    },
+
+        // [Electron Refactor] 从主进程数据中获取历史键列表
+    async _getHistories() {
+        try {
+            const keys = await Storage.scanHistoryKeys();
+            return keys.slice(0, 20).map(({ key, timestamp }) => {
+                const dt = new Date(timestamp);
+                const h  = dt.getHours();
+                return {
+                    key,
+                    timestamp,
+                    dateStr: dt.toLocaleDateString('zh-CN'),
+                    timeStr: dt.toLocaleTimeString('zh-CN'),
+                    shift: (h >= 6 && h < 18) ? '白班' : '夜班'
+                };
+            });
+        } catch (e) {
+            Logger.error('Get histories failed', e);
+            return [];
+        }
+    },
+
+    async loadHistory(fullKey) {
+        try {
+            const data = await Storage.get(fullKey);
+            if (!data) { UI.toast('❌ 历史数据不存在'); return; }
+            AppState.setHistoryMode(true);
+            const success = await DataModule.loadData(data);
+            if (success) {
+                Modal.close();
+                UI.toast(`📖 已加载历史记录`);
+            } else {
+                AppState.setHistoryMode(false);
+                UI.toast('❌ 加载失败');
+            }
+        } catch (e) {
+            AppState.setHistoryMode(false);
+            Logger.error('Load history failed', e);
+        }
+    },
+
+    async loadPrevious() {
+        try {
+            const data = await Storage.get(CONFIG.KEYS.PREVIOUS_BACKUP);
+            if (!data) { UI.toast('未发现历史快照'); return; }
+            const targetData = (data && data.payload) ? data.payload : data;
+            AppState.setHistoryMode(true);
+            const success = await DataModule.loadData(targetData);
+            if (success) {
+                UI.toast('📖 已加载上一班数据');
+            } else {
+                AppState.setHistoryMode(false);
+                UI.toast('❌ 加载失败');
+            }
+        } catch (e) {
+            AppState.setHistoryMode(false);
+            Logger.error('Load previous failed', e);
+        }
+    },
+
+    async exitHistory() {
+        try {
+            if (!AppState.system.isHistoryMode) return;
+            // [SRE-FIX] 先加载当前数据，成功后才解锁界面，防止加载失败时
+            // 界面已可编辑但显示的是历史数据，操作员误保存导致主数据被历史数据覆盖
+            Storage._invalidateCache();
+            const allData = await Storage._loadAllData();
+            const currentData = allData[CONFIG.KEYS.MAIN_DATA];
+            if (currentData) {
+                const ok = await DataModule.loadData(currentData);
+                if (!ok) throw new Error('主数据加载校验失败');
+                AppState.setHistoryMode(false);
+                UI.toast('✅ 已返回当前班次');
+            } else {
+                // 无主数据（新班次尚未保存），解锁并渲染空白界面
+                AppState.setHistoryMode(false);
+                RenderModule.renderStations();
+                RenderModule.renderStats();
+                RenderModule.renderInventory();
+                DOMCache.refreshTables();
+                UI.toast('✅ 已返回当前班次');
+            }
+        } catch (e) {
+            Logger.error('Exit history failed', e);
+            // [SRE-FIX] 失败时严禁停留在可编辑的历史界面，强制重载
+            location.reload();
+        }
+    }
+};
+
+/* ==================== 24. 主要操作模块 ==================== */
+const AppActions = {
+    _autoSaveTimer: null,
+    _saveQueue: Promise.resolve(),
+
+    triggerAutoSave() {
+        try {
+            if (AppState.system.isHistoryMode) return;
+            AppState.data.modified = true;
+            SaveIndicator.setModified();
+            clearTimeout(this._autoSaveTimer);
+            this._autoSaveTimer = setTimeout(() => {
+                this._saveQueue = this._saveQueue
+                    .then(() => this._performAutoSave())
+                    .catch(e => Logger.error('Save queue error', e));
+                SaveIndicator.setPending();
+            }, CONFIG.AUTO_SAVE_INTERVAL); // [S1-FIX] 补全 setTimeout 回调的 } 和 ) 及分号
+        } catch (e) {
+            Logger.error('Trigger auto save failed', e);
+        }
+    },
+
+    async _performAutoSave() {
+        // [SIMPLIFY] 移除 requestIdleCallback 调度，直接执行
+        // 1. 基础检查：是否正在保存、是否历史模式、是否有数据变更
+        if (AppState.system.isSaving || AppState.system.isHistoryMode) return;
+        if (!AppState.data.modified) return; // 数据未变更，直接返回，不打扰硬盘
+
+        AppState.system.isSaving = true;
+        
+        // 2. 锁定手动保存按钮，防止冲突
+        const saveBtn = document.getElementById(DOM_IDS.BTN_MANUAL_SAVE);
+        if (saveBtn) saveBtn.disabled = true;
+
+        // 3. 设置 UI 状态
+        SaveIndicator.setPending();
+
+        try {
+            const data = await DataModule.getCurrentData();
+            
+            // 4. 执行保存 (await 确保串行)
+            if (data) {
+                const success = await Storage.saveMainData(data);
+                
+                if (success) {
+                    AppState.data.modified = false;
+                    AppState.data.lastSaved = Date.now();
+                    SaveIndicator.setSaved();
+                    // 仅记录日志，不再进行复杂的 IPC 通信
+                    // Logger.info('Auto saved'); 
+                } else {
+                    SaveIndicator.setFailed();
+                }
+            }
+        } catch (e) {
+            console.error('[AutoSave] Failed', e);
+            SaveIndicator.setFailed();
+        } finally {
+            // 5. 释放锁和按钮
+            AppState.system.isSaving = false;
+            if (saveBtn) saveBtn.disabled = false;
+        }
+    },
+
+        async manualSave() {
+        try {
+            if (AppState.system.isHistoryMode) { UI.toast("⚠️ 历史模式无法保存"); return; }
+            // [HIGH-NEW-2 FIX] 连续点击保存时，若上一次保存仍在进行，直接提示并返回。
+            // 防止 _saveQueue Promise 链无限堆积，以及 await this._saveQueue 长时间阻塞按钮。
+            if (AppState.system.isSaving) { UI.toast("⏳ 正在保存中，请稍候..."); return; }
+
+            // 1. 取消 pending 的自动保存，避免重复写入
+            clearTimeout(this._autoSaveTimer);
+            this._autoSaveTimer = null;
+
+            // 2. [R2-FIX] 直接入队，不再嵌套 new Promise，消除状态不一致风险
+            this._saveQueue = this._saveQueue
+                .then(() => this._doManualSave())
+                .catch(e => Logger.error('manualSave queue error', e));
+            await this._saveQueue;
+        } catch (e) {
+            Logger.error('Manual save wrapper failed', e);
+            UI.toast("❌ 保存异常：" + e.message);
+        }
+    },
+
+    // [R2-FIX] 独立提取保存逻辑，职责单一，便于测试和维护
+    async _doManualSave() {
+        if (AppState.system.isSaving) return; // 已有保存在进行，跳过
+        AppState.system.isSaving = true;
+        const saveBtn = document.getElementById(DOM_IDS.BTN_MANUAL_SAVE);
+        if (saveBtn) saveBtn.disabled = true;
+        try {
+            const data = await DataModule.getCurrentData();
+            if (!data) {
+                UI.toast("❌ 获取数据失败");
+                return;
+            }
+            if (!DataPureFunctions.validateDataSchema(data)) {
+                UI.toast("⚠️ 数据结构异常，拒绝保存");
+                return;
+            }
+            const success = await Storage.saveMainData(data);
+            if (!success) throw new Error('saveMainData returned false');
+            // [Y18-FIX] 删除多余的 _invalidateCache()：saveMainData→Storage.set 成功时已更新缓存，
+            // 再 invalidate 会清掉刚写好的缓存，导致下次操作多一次无谓 IO
+            AppState.data.modified = false;
+            AppState.data.lastSaved = Date.now();
+            UI.toast("✅ 数据已保存");
+            SaveIndicator.setSaved();
+        } catch (err) {
+            Logger.error('_doManualSave failed', err);
+            UI.toast("❌ 保存异常：" + (err.message || "未知错误"));
+            SaveIndicator.setFailed();
+        } finally {
+            AppState.system.isSaving = false;
+            if (saveBtn) saveBtn.disabled = false;
+        }
+    },
+
+    // [Electron Refactor] 历史键扫描通过 Storage.scanHistoryKeys（从主进程数据中提取）
+    _scanHistoryKeysDone: [],
+    _scanHistoryKeys() {
+        // 同步版本返回已缓存的键列表（异步获取由 _cleanupHistory 等负责）
+        return this._scanHistoryKeysDone;
+    },
+
+    async _scanHistoryKeysAsync() {
+        this._scanHistoryKeysDone = await Storage.scanHistoryKeys();
+        return this._scanHistoryKeysDone;
+    },
+
+    async _cleanupHistory(maxCount = CONFIG.HISTORY_MAX_COUNT, maxAgeDays = CONFIG.HISTORY_MAX_DAYS) {
+        const now      = Date.now();
+        const maxAgeMs = maxAgeDays * 24 * 3600 * 1000;
+        const allKeys  = await this._scanHistoryKeysAsync();
+
+        const toDelete = [];
+        const valid    = [];
+        for (const h of allKeys) {
+            if (maxAgeMs > 0 && now - h.timestamp > maxAgeMs) {
+                toDelete.push(h);
+                Logger.info(`Will delete expired: ${h.key}`);
+            } else {
+                valid.push(h);
+            }
+        }
+        valid.slice(maxCount).forEach(h => {
+            toDelete.push(h);
+            Logger.info(`Will delete excess: ${h.key}`);
+        });
+
+        if (toDelete.length === 0) return;
+
+        const allData = await Storage._loadAllData();
+        // [R17-FIX] 浅拷贝后再删除，不直接修改 _cachedAllData 引用，防止缓存污染
+        const nextData = Object.assign({}, allData);
+        toDelete.forEach(h => {
+            delete nextData[h.key];
+            delete nextData[h.key + '_BAK'];
+        });
+        // [QUEUE-CLEANUP FIX] 通过 _enqueueWrite 串行化，防止与并发 Storage.set 产生写竞争
+        await Storage._enqueueWrite(async () => {
+            const result = await window.electronAPI.saveData(nextData);
+            if (result && result.success) {
+                Storage._cachedAllData = nextData;
+                Storage._cacheTs = Date.now();
+                Logger.info(`Cleanup complete: deleted ${toDelete.length} history entries in 1 write`);
+            } else {
+                Storage._invalidateCache();
+                Logger.error('Cleanup write failed');
+            }
+        });
+    },
+
+    async confirmHandover() {
+        try {
+            if (AppState.system.isHistoryMode) { UI.toast('⚠️ 历史模式下无法交班，请先返回当前'); return; }
+            // [R4-FIX] 交班前检查保存锁，避免与 autoSave 并发
+            if (AppState.system.isSaving) { UI.toast('⚠️ 正在保存中，请稍后再交班'); return; }
+
+            // [R9-FIX] 增加二次确认，防止误触
+            Modal.show({
+                title: '⚠️ 确认交班',
+                content: '交班将保存本班数据并清空记录，开始新班次。\n\n确定现在交班吗？',
+                onConfirm: () => this._doConfirmHandover()
+            });
+        } catch (e) {
+            Logger.error('Confirm handover failed', e);
+            UI.toast('❌ 交班失败：' + e.message);
+        }
+    },
+
+    async _doConfirmHandover() {
+        try {
+            if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                document.activeElement.blur();
+            }
+            // [SRE-FIX] 立即上锁，封堵 Storage.set(historyKey) await 期间 autoSave 并发写入的真空期
+            AppState.system.isSaving = true;
+            // [FATAL-DOM FIX] 同步抓取 DOM 数据（blur() 已保证输入框值已提交）
+            // [HANDOVER-TIMEOUT FIX] 移除 setTimeout 50ms：preSnapshot 已同步抓到，
+            // setTimeout 是多余的真空期，可能导致息屏同时触发 _asyncSaveOnHide 与交班并发
+            const preSnapshot = DataModule.collectCurrentDataSync();
+            (async () => {
+                try {
+                    const data = preSnapshot || await DataModule.getCurrentData();
+                    if (!data) { AppState.system.isSaving = false; UI.toast('❌ 获取数据失败'); return; }
+                    const now   = new Date();
+                    const h     = now.getHours();
+                    const shift = (h >= 6 && h < 18) ? '白班' : '夜班';
+                    data.shift     = shift;
+                    data.shiftDate = now.toLocaleDateString('zh-CN');
+                    data.shiftTime = now.toLocaleTimeString('zh-CN', { hour12: false });
+
+                    const historyKey = `HF_HISTORY_${Util.monoId()}`;
+                    await Storage.set(historyKey, data);
+
+                    if (window.electronAPI && window.electronAPI.saveBackup) {
+                        const _backupNow = new Date();
+                        const _pad = n => String(n).padStart(2, '0');
+                        const _today   = `${_backupNow.getFullYear()}-${_pad(_backupNow.getMonth()+1)}-${_pad(_backupNow.getDate())}`;
+                        const _timeStr = `${_pad(_backupNow.getHours())}-${_pad(_backupNow.getMinutes())}-${_pad(_backupNow.getSeconds())}`;
+                        const filename  = `backup_${_today}_${_timeStr}.json`;
+                        try {
+                            await window.electronAPI.saveBackup(filename, JSON.stringify(data, null, 2));
+                            UI.toast('✅ 已自动备份到backup文件夹');
+                        } catch (err) {
+                            Logger.error('Backup failed', err);
+                            UI.toast('⚠️ 自动备份失败，但继续交班');
+                        }
+                    } else {
+                        UI.toast('✅ 已保存到历史记录');
+                    }
+
+                    await this._executeHandover(data);
+                } catch (innerErr) {
+                    Logger.critical('Handover inner execution failed', innerErr);
+                    UI.toast('❌ 交班执行异常：' + (innerErr.message || '未知错误'));
+                    // [FATAL-1 FIX] Storage.set(historyKey) 失败时 _executeHandover 从未执行，
+                    // 其 finally 不会运行，必须在此处补充释放锁，否则整班 autoSave 全部被阻塞
+                    AppState.system.isSaving = false;
+                }
+            })().catch(e => {
+                // [HIGH-NEW-1 FIX] IIFE 兜底 catch：理论上内层 try/catch 已全覆盖，
+                // 此处防止 V8 极端场景下漏出的 unhandledrejection 触发全局错误计数器，
+                // 误判为启动崩溃并弹出停机屏。
+                Logger.critical('Handover IIFE uncaught escape', e);
+                AppState.system.isSaving = false;
+                UI.toast('❌ 交班异常（兜底）：' + (e && e.message ? e.message : '未知错误'));
+            });
+        } catch (e) {
+            AppState.system.isSaving = false; // [FATAL-1 FIX] 外层同步catch释放锁
+            Logger.error('_doConfirmHandover failed', e);
+            UI.toast('❌ 交班失败：' + e.message);
+        }
+    },
+
+    async _executeHandover(currentData) {
+        try {
+            clearTimeout(this._autoSaveTimer);
+            this._autoSaveTimer = null;
+            AppState.system.isSaving = true;
+            // [ATOM-FIX] 不在这里提前清 modified：新班次写盘失败时 modified 保持 true，
+            // SaveIndicator 继续显示"待存"，操作员不会被误导以为数据安全
+
+            await Storage.set(CONFIG.KEYS.PREVIOUS_BACKUP, {
+                timestamp: Date.now(),
+                duty: AppState.data.currentDuty,
+                payload: currentData
+            });
+            Storage._invalidateCache();
+
+            const newData = {
+                version: CONFIG.VERSION,
+                timestamp: Date.now(),
+                duty: AppState.data.currentDuty,
+                stations: {},
+                notes: { imp: '', safe: '', hand: '设备良好，安全无事' },
+                inv: currentData.inv || {},
+                rets: []
+            };
+
+            AppState.config.stations.forEach(s => {
+                newData.stations[s] = {
+                    arrival: [],
+                    departure: DataPureFunctions.rolloverDepartureRows(currentData.stations[s]?.departure || [])
+                };
+            });
+
+            if (currentData.rets) {
+                newData.rets = currentData.rets
+                    .filter(ret => !ret.t || ret.t.trim() === '')
+                    .map(ret => ({ ...ret, _isHandover: true }));
+            }
+
+            // [Electron Refactor] 通过 electronAPI 写入新班次初始数据
+            const saveSuccess = await Storage.saveMainData(newData);
+            if (!saveSuccess) throw new Error('Post-handover saveMainData failed');
+            // [ATOM-FIX] 只有新班次落盘成功，才标记数据干净、刷新缓存
+            Storage._invalidateCache();
+            AppState.data.modified = false;
+
+            // [HIGH-D FIX] 交班后立即清理历史，避免工控机长时间不重启时历史累积
+            try { await this._cleanupHistory(); } catch (ce) { Logger.warn('Post-handover cleanup failed', ce); }
+
+            UI.toast('✅ 交班成功，正在刷新...');
+            setTimeout(() => {
+                if (window.electronAPI && typeof window.electronAPI.reloadWindow === 'function') {
+                    window.electronAPI.reloadWindow().catch(() => location.reload());
+                } else {
+                    location.reload();
+                }
+            }, 1000);
+        } catch (e) {
+            Logger.error('Execute handover failed', e);
+            UI.toast('❌ 交班执行失败：' + e.message);
+        } finally {
+            // [FATAL-B FIX] 无论成功或失败都重置锁，防止整班后续保存全部失效
+            AppState.system.isSaving = false;
+        }
+    },
+};
+
+/* ==================== 25. 管理面板模块 ==================== */
+const AdminPanel = {
+    _draggingEl: null,
+
+    // [MED-NEW-3 FIX] 实例方法替代闭包：不持有任何特定 container 引用，
+    // 遍历当前所有活跃 .tag-container 元素执行清理，保证第N次打开面板后也能正常重置。
+    _resetAllDragState() {
+        if (this._draggingEl) {
+            this._draggingEl.classList.remove('dragging');
+            this._draggingEl = null;
+        }
+        document.body.classList.remove('is-dragging-tag');
+        document.querySelectorAll('[data-hasDragEvents]').forEach(c => c.classList.remove('drag-over'));
+    },
+
+    open() {
+        try {
+            const overlay = DOM.getElement(DOM_IDS.ADMIN_OVERLAY);
+            if (!overlay) return;
+            this._populateTags();
+            overlay.style.display = 'flex';
+            document.body.classList.add('modal-open');
+        } catch (e) {
+            Logger.error('Open admin failed', e);
+        }
+    },
+
+    close() {
+        try {
+            const overlay = DOM.getElement(DOM_IDS.ADMIN_OVERLAY);
+            if (overlay) { overlay.style.display = 'none'; this._draggingEl = null; }
+            document.body.classList.remove('modal-open');
+        } catch (e) {
+            Logger.error('Close admin failed', e);
+        }
+    },
+
+    _populateTags() {
+        try {
+            this._renderTags('tags-stations',     AppState.config.stations);
+            this._renderTags('tags-duties',        AppState.config.duties);
+            this._renderTags('tags-inv-stations',  AppState.config.invStations);
+            ['stations', 'duties', 'inv-stations'].forEach(type => {
+                const input = DOM.getElement(`input-${type}`);
+                if (input) {
+                    input.onkeydown = (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const value = input.value.trim();
+                            if (value) {
+                                const container = DOM.getElement(`tags-${type}`);
+                                this._addTag(container, value);
+                                input.value = '';
+                            }
+                        }
+                    };
+                }
+            });
+        } catch (e) {
+            Logger.error('Populate tags failed', e);
+        }
+    },
+
+    _renderTags(containerId, items) {
+        try {
+            const container = DOM.getElement(containerId);
+            if (!container) return;
+            container.innerHTML = '';
+            // [HIGH-4 FIX] 不删除 hasDragEvents 标记：ondragstart/ondragend 已改为属性赋值（幂等），
+            // 但保留标记可避免 _initContainerDrag 被不必要地重复调用，代码更干净
+            // delete container.dataset.hasDragEvents;  ← 已永久注释
+            items.forEach(item => this._addTag(container, item));
+        } catch (e) {
+            Logger.error('Render tags failed', e);
+        }
+    },
+
+    _addTag(container, text) {
+        try {
+            const tag = document.createElement('span');
+            tag.className = 'tag-item';
+            tag.dataset.tagText = text;
+            tag.setAttribute('draggable', 'true');
+            tag.appendChild(document.createTextNode(text));
+            if (!container.dataset.hasDragEvents) {
+                this._initContainerDrag(container);
+                container.dataset.hasDragEvents = 'true';
+            }
+            const closeBtn = document.createElement('span');
+            closeBtn.className = 'close-btn';
+            closeBtn.innerHTML = '&times;';
+            closeBtn.onclick = (e) => { e.stopPropagation(); tag.remove(); };
+            tag.appendChild(closeBtn);
+            container.appendChild(tag);
+        } catch (e) {
+            Logger.error('Add tag failed', e);
+        }
+    },
+
+    _initContainerDrag(container) {
+        // [FATAL-3 FIX] 每次打开设置面板 _renderTags 会重置 hasDragEvents，导致 _initContainerDrag
+        // 被重复调用。addEventListener 注册的 dragstart/dragend 会叠加（每打开一次多一个 handler），
+        // 改为属性赋值（ondragstart/ondragend），后赋值覆盖前值，从根源消除重复注册。
+        // [MED-DRAG FIX] window 级 mouseup/blur 兜底：鼠标拖出窗口松开时 dragend 不触发，
+        // is-dragging-tag 永久残留在 body，导致 tag-item pointer-events:none 无法点击。
+        // [MED-NEW-3 FIX] 原实现用闭包捕获 container 引用，第二次打开面板后 _renderTags 会
+        // innerHTML='' 重建容器，旧闭包中的 container 已是废弃 DOM 节点，
+        // container.classList.remove('drag-over') 无效，is-dragging-tag 残留导致 tag 无法点击。
+        // 改为实例方法 _resetAllDragState，遍历所有 .tag-container 清理，不依赖特定 container 引用。
+        if (!window._dragResetBound) {
+            window.addEventListener('mouseup', () => this._resetAllDragState());
+            window.addEventListener('blur',    () => this._resetAllDragState());
+            window._dragResetBound = true;
+        }
+        let isScheduled = false;
+        container.ondragstart = (e) => {
+            const tag = e.target.closest('.tag-item');
+            if (!tag || tag.parentNode !== container) return;
+            this._draggingEl = tag;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', tag.dataset.tagText || '');
+            setTimeout(() => { tag.classList.add('dragging'); document.body.classList.add('is-dragging-tag'); }, 0);
+        };
+        container.ondragend = (e) => {
+            const tag = e.target.closest('.tag-item');
+            if (tag) tag.classList.remove('dragging');
+            this._draggingEl = null;
+            container.classList.remove('drag-over');
+            document.body.classList.remove('is-dragging-tag');
+        };
+        container.ondragover = (e) => {
+            e.preventDefault();
+            e.stopPropagation(); // [HIGH-DRAGCURSOR FIX] 阻止冒泡到 document 的全局 dragover 监听器，
+            // 防止 document 级 dropEffect='none' 覆盖此处的 'move'，导致拖拽显示禁止光标
+            if (!this._draggingEl || this._draggingEl.parentNode !== container) return;
+            container.classList.add('drag-over');
+            if (isScheduled) return;
+            isScheduled = true;
+            requestAnimationFrame(() => {
+                isScheduled = false;
+                const afterElement = this._getDragAfterElement(container, e.clientX, e.clientY);
+                const currentNext  = this._draggingEl.nextElementSibling;
+                if (afterElement !== currentNext) {
+                    if (afterElement) container.insertBefore(this._draggingEl, afterElement);
+                    else container.appendChild(this._draggingEl);
+                }
+            });
+        };
+        container.ondragleave = () => container.classList.remove('drag-over');
+        container.ondrop = (e) => { e.preventDefault(); e.stopPropagation(); container.classList.remove('drag-over'); }; // [HIGH-DRAGCURSOR FIX]
+    },
+
+    _getDragAfterElement(container, x, y) {
+        const draggableElements = [...container.querySelectorAll('.tag-item:not(.dragging)')];
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const dx  = x - (box.left + box.width / 2);
+            const dy  = y - (box.top  + box.height / 2);
+            const distance = dx * dx + dy * dy;
+            return distance < closest.distance ? { distance, element: child } : closest;
+        }, { distance: Number.POSITIVE_INFINITY }).element;
+    },
+
+    _isApplying: false,
+
+    applyConfig() {
+        // [MED-NEW-2 FIX] 防止 close() 后50ms窗口内重复点击，导致两个 Modal 叠加
+        // 并触发两次 _doApplyConfig → 两次 reload 相互竞争行为未定义。
+        // _isApplying 随 reload 自动重置，无需手动释放。
+        if (this._isApplying) return;
+        this._isApplying = true;
+        this.close();
+        setTimeout(() => { this._checkOrphanData(); }, 50);
+    },
+
+    _checkOrphanData() {
+        try {
+            const newStations = this._getTags('tags-stations');
+            const oldStations = AppState.config.stations;
+            const removedOrRenamed = oldStations.filter(s => !newStations.includes(s));
+
+            if (removedOrRenamed.length > 0) {
+                const currentData = DataModule.collectCurrentDataSync();
+                let hasOrphanData = false;
+                removedOrRenamed.forEach(s => {
+                    if (currentData.stations[s]) {
+                        const dep = currentData.stations[s].departure || [];
+                        const arr = currentData.stations[s].arrival   || [];
+                        if (dep.length > 0 || arr.length > 0) hasOrphanData = true;
+                    }
+                });
+                if (hasOrphanData) {
+                    Modal.show({
+                        title: "🚨 危险操作警告！",
+                        content: `以下车站已被删除或改名：\n${removedOrRenamed.map(s => `  • ${s}`).join('\n')}\n\n这些车站的当前记录将【永久丢失】，无法恢复！\n\n如有重要数据，请先取消并手动交班后再修改配置。\n\n确定要继续吗？`,
+                        onConfirm: () => { this._doApplyConfig(); }
+                    });
+                    return;
+                }
+            }
+
+            Modal.show({
+                title: "⚠️ 配置重启警告",
+                content: "更改配置将重启界面！\n系统将为您自动暂存和恢复当前数据。\n\n确定要继续吗？",
+                onConfirm: () => { this._doApplyConfig(); }
+            });
+        } catch (e) {
+            Logger.error('Config check failed', e);
+            UI.toast("❌ 配置检查出错");
+            this.open();
+        }
+    },
+
+    async _doApplyConfig() {
+        try {
+            // [SRE-FIX] 配置写入期间上锁，防止 autoSave 并发写入造成数据互相覆盖
+            // reload 前不需要手动释放，渲染进程重建后锁自动清除
+            AppState.system.isSaving = true;
+            const currentData = await DataModule.getCurrentData();
+            if (currentData) await Storage.set(CONFIG.KEYS.SETTINGS_CHANGE_BACKUP, currentData);
+
+            const newConfig = {
+                stations:    this._getTags('tags-stations'),
+                duties:      this._getTags('tags-duties'),
+                invStations: this._getTags('tags-inv-stations')
+            };
+            newConfig.dropdowns = newConfig.stations.slice();
+
+            await Storage.set(CONFIG.KEYS.SETTINGS, newConfig);
+            // [AUDIT-FIX-11] 同 BUG-8，Electron 中优先用 reloadWindow
+            if (window.electronAPI && typeof window.electronAPI.reloadWindow === 'function') {
+                await window.electronAPI.reloadWindow();
+            } else {
+                location.reload();
+            }
+        } catch (e) {
+            Logger.error('Apply config failed', e);
+            // [S9-FIX] 配置应用失败时【不删除】settingsBackup，
+            // 保留备份让下次重启能恢复用户数据，只撤销 SETTINGS 写入（主进程原子写，失败不影响旧值）
+            UI.toast("❌ 配置应用失败：" + e.message);
+            this.open();
+        } finally {
+            // [FATAL-1 FIX] finally 确保无论 reload/catch/正常路径，锁必然释放
+            // reload 前执行一次无害，catch 路径确保 autoSave 不被永久阻塞
+            AppState.system.isSaving = false;
+        }
+    },
+
+    _getTags(containerId) {
+        try {
+            const container = DOM.getElement(containerId);
+            if (!container) return [];
+            return Array.from(container.querySelectorAll('.tag-item'))
+                // [MED-NEW-1 FIX] 拖拽异常导致 firstChild 为 null 时，回退读取 data-tagText，
+                // 两者都缺失则过滤掉，防止 _doApplyConfig 把空字符串写入配置，保存后车站/班次全丢
+                .map(tag => (tag.firstChild ? tag.firstChild.textContent.trim() : (tag.dataset.tagText || '').trim()))
+                .filter(Boolean);
+        } catch (e) {
+            Logger.error('Get tags failed', e);
+            return [];
+        }
+    }
+};
+
+/* ==================== 26. 键盘导航模块 ==================== */
+const KeyboardNavModule = {
+    SKIP_KEYS: ['toStation', 'fromStation'],
+    _initialized: false,
+
+    init() {
+        // [FATAL-2 FIX] document 级监听器，重复注册会叠加，必须守卫
+        if (this._initialized) return;
+        this._initialized = true;
+        try {
+            document.addEventListener('keydown', (e) => {
+                // [Electron Refactor] 禁用刷新键：F5 和 Ctrl+R，防止工控机误操作
+                if (e.key === 'F5') {
+                    e.preventDefault();
+                    UI.toast('⚠️ 刷新已禁用，请使用系统菜单操作');
+                    return;
+                }
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R')) {
+                    e.preventDefault();
+                    UI.toast('⚠️ 刷新已禁用，请使用系统菜单操作');
+                    return;
+                }
+                this._handleKeyNav(e);
+            });
+            Logger.info('Keyboard nav initialized (Excel Style) [Electron Refactor]');
+        } catch (e) {
+            Logger.error('Keyboard nav init failed', e);
+        }
+    },
+
+    _handleKeyNav(e) {
+        try {
+            if (AppState.system.isHistoryMode) return;
+            if (document.body.classList.contains('modal-open')) return;
+            const el = document.activeElement;
+            if (!this._isInput(el)) return;
+            const td = el.closest('td');
+            const tr = el.closest('tr');
+            if (!td || !tr) return;
+            const colIndex = Array.from(tr.children).indexOf(td);
+            switch(e.key) {
+                case "Enter":
+                    e.preventDefault(); this._moveNext(tr, colIndex, 1); break;
+                case "Tab":
+                    e.preventDefault(); this._moveNext(tr, colIndex, e.shiftKey ? -1 : 1); break;
+                case "ArrowDown":
+                    e.preventDefault(); this._moveVertical(tr, colIndex, 1); break;
+                case "ArrowUp":
+                    e.preventDefault(); this._moveVertical(tr, colIndex, -1); break;
+                case "ArrowRight":
+                    if (this._shouldMoveHorizontal(el, 'right')) { e.preventDefault(); this._moveNext(tr, colIndex, 1); } break;
+                case "ArrowLeft":
+                    if (this._shouldMoveHorizontal(el, 'left'))  { e.preventDefault(); this._moveNext(tr, colIndex, -1); } break;
+            }
+        } catch (e) {
+            Logger.error('Key nav handler failed', e);
+        }
+    },
+
+    _isInput(el) {
+        return el && (el.classList.contains('row-input') ||
+                      el.classList.contains('ret-input') ||
+                      el.classList.contains('inv-input'));
+    },
+
+    _moveNext(currentTr, colIndex, direction) {
+        let nextTr  = currentTr;
+        let nextCol = colIndex + direction;
+        let safetyCounter = 0;
+        const MAX_STEPS = 3600; // MAX_ROWS_PER_TABLE(500) × FIELDS(6) × 略余量
+        while (safetyCounter++ < MAX_STEPS) {
+            if (nextCol >= nextTr.children.length) {
+                nextTr = nextTr.nextElementSibling;
+                if (!nextTr) return;
+                nextCol = 0;
+            } else if (nextCol < 0) {
+                nextTr = nextTr.previousElementSibling;
+                if (!nextTr) return;
+                nextCol = nextTr.children.length - 1;
+            }
+            const targetTd = nextTr.children[nextCol];
+            if (!targetTd) { nextCol += direction; continue; }
+            const input = targetTd.querySelector('.row-input, .ret-input, .inv-input');
+            const shouldSkip = input?.dataset.key && this.SKIP_KEYS.includes(input.dataset.key);
+            if (input && !input.disabled && !input.readOnly && !shouldSkip) {
+                this._focusInput(input, false);
+                return;
+            }
+            nextCol += direction;
+        }
+    },
+
+    _moveVertical(currentTr, colIndex, direction) {
+        // [W5-FIX] 跳过 history-ref-row，避免光标静默停在只读参考行
+        let targetTr = direction === 1 ? currentTr.nextElementSibling : currentTr.previousElementSibling;
+        while (targetTr && targetTr.classList.contains('history-ref-row')) {
+            targetTr = direction === 1 ? targetTr.nextElementSibling : targetTr.previousElementSibling;
+        }
+        if (targetTr) {
+            const targetTd = targetTr.children[colIndex];
+            const input    = targetTd?.querySelector('.row-input, .ret-input, .inv-input');
+            if (input && !input.disabled && !input.readOnly) this._focusInput(input, false);
+        }
+    },
+
+    _focusInput(input, selectAll = true) {
+        setTimeout(() => {
+            input.focus();
+            // type="number" 和 type="checkbox" 不支持 select()/setSelectionRange()，跳过
+            if (input.tagName === 'INPUT' && input.type !== 'checkbox' && input.type !== 'number') {
+                if (selectAll) {
+                    input.select();
+                } else {
+                    const len = input.value.length;
+                    input.setSelectionRange(len, len);
+                }
+            }
+        }, 0);
+    },
+
+    _shouldMoveHorizontal(el, direction) {
+        if (el.tagName === 'SELECT' || el.type === 'number') return true;
+        if (direction === 'right') return el.selectionStart === el.value.length;
+        return el.selectionStart === 0;
+    }
+};
+
+/* ==================== 27. 应用初始化 ==================== */
+const App = {
+    async init() {
+        try {
+            Logger.info('Application starting v2.5...');
+
+            const stateInitSuccess = await AppState.init();
+            if (!stateInitSuccess) {
+                Logger.warn('[App.init] AppState.init failed, running with CONFIG.DEFAULT');
+                UI.toast('⚠️ 配置加载失败，已使用默认车站配置');
+            }
+
+            // 2. 启动日志清理
+            Logger.startAutoCleanup();
+
+            // 3. 启动时钟
+            ClockModule.start();
+
+            // 4. 初始化班次选择器
+            this._initDutySelector();
+
+            // 5. 渲染UI
+            if (!AppState.config.stations || AppState.config.stations.length === 0) {
+                Logger.warn('[App.init] stations empty before render, resetting to DEFAULT');
+                AppState.config.stations    = CONFIG.DEFAULT.stations.slice();
+                AppState.config.duties      = CONFIG.DEFAULT.duties.slice();
+                AppState.config.invStations = CONFIG.DEFAULT.invStations.slice();
+                AppState.config.dropdowns   = CONFIG.DEFAULT.stations.slice();
+            }
+            RenderModule.renderStations();
+            RenderModule.renderStats();
+            RenderModule.renderInventory();
+
+            // 6. 初始化DOM缓存（渲染完成后立即建立）
+            DOMCache.init();
+
+            // 7. 初始化回送表
+            await ReturnModule.init();
+
+            // 8. 加载会话数据
+            await this._loadSession();
+
+            // 9. 初始化功能模块
+            SearchModule.init();
+            DuplicateCheckModule.init();
+            KeyboardNavModule.init();
+            if (typeof TableModule !== 'undefined') TableModule.init();
+
+            this._registerCloseRequestHandler();
+
+            // 11. 标记就绪
+            // [U17-FIX] 启动成功后清除崩溃计数，本次属于正常启动
+            try { localStorage.removeItem('hf_crash_count'); } catch (_) {}
+            Logger.info('✅ Application initialized successfully v2.5 [Electron]');
+            UI.toast('系统已加载完成');
+        } catch (e) {
+            Logger.critical('Application init failed', e);
+            Modal.show({
+                title: "❌ 系统初始化失败",
+                content: "错误信息：" + e.message + "\n请检查控制台日志以获取详情。"
+            });
+        }
+    },
+
+    _initDutySelector() {
+        try {
+            const select = DOM.getElement(DOM_IDS.DUTY_SELECTOR);
+            if (!select) return;
+            select.innerHTML = AppState.config.duties
+                .map(d => `<option value="${Util.escapeHTML(d)}">${Util.escapeHTML(d)}</option>`) // [W1-FIX] escapeHTML防止班次名含"或<时破坏select结构
+                .join('');
+            if (AppState.config.duties.length > 0) {
+                select.value = AppState.config.duties[0];
+                AppState.data.currentDuty = AppState.config.duties[0];
+            }
+        } catch (e) {
+            Logger.error('Init duty selector failed', e);
+        }
+    },
+
+    _closeHandlerRegistered: false,
+    _registerCloseRequestHandler() {
+        try {
+            if (!window.electronAPI || typeof window.electronAPI.onCloseRequest !== 'function') {
+                Logger.warn('[App] electronAPI.onCloseRequest 不可用，跳过注册');
+                return;
+            }
+            if (this._closeHandlerRegistered) {
+                Logger.warn('[App] onCloseRequest 已注册，跳过重复注册');
+                return;
+            }
+            this._closeHandlerRegistered = true;
+            window.electronAPI.onCloseRequest(async () => {
+                Logger.info('[App] 收到主进程关闭请求');
+                try {
+                    if (AppState.data.modified && !AppState.system.isHistoryMode) {
+                        const choice = await window.electronAPI.showExitDialog(
+                            '数据尚未保存，是否保存后退出？'
+                        );
+                        // 0=保存退出, 1=直接退出, 2=取消
+                        if (choice === 2) {
+                            Logger.info('[App] 用户取消关闭');
+                            return;
+                        }
+                        if (choice === 0) {
+                            const data = await DataModule.getCurrentData();
+                            // [R3-FIX] 保存失败时阻止关窗，不能静默丢数据
+                            const ok = data ? await Storage.saveMainData(data) : false;
+                            if (!ok) {
+                                Logger.error('[App] 关闭前保存失败，阻止关窗');
+                                UI.toast('❌ 保存失败，请重试后再关闭');
+                                return;
+                            }
+                        }
+                    }
+                    await window.electronAPI.closeWindow();
+                } catch (e) {
+                    Logger.error('[App] 关闭请求处理失败', e);
+                    try { await window.electronAPI.closeWindow(); } catch (_) {}
+                }
+            });
+            Logger.info('[App] onCloseRequest 监听器已注册 [Electron Refactor]');
+        } catch (e) {
+            Logger.error('[App] 注册关闭监听器失败', e);
+        }
+    },
+
+        async _loadSession() {
+        try {
+            const allData = await Storage._loadAllData();
+            
+            // 1. 优先恢复配置变更备份 (这是用户显式保存的，优先级最高)
+            const settingsBackup = allData[CONFIG.KEYS.SETTINGS_CHANGE_BACKUP];
+            if (settingsBackup) {
+                // [R11-FIX] 无论成功与否都删除备份，防止损坏数据导致永远重试
+                await Storage.remove(CONFIG.KEYS.SETTINGS_CHANGE_BACKUP);
+                if (DataPureFunctions.validateDataSchema(settingsBackup)) {
+                    // [DEL-STATION FIX] skipStationRecovery=true：
+                    // 用户刚刚主动改过配置（包括删站），不能把旧数据里的站名注回去
+                    await DataModule.loadData(settingsBackup, { skipStationRecovery: true });
+                    Logger.info('Restored from settings change backup');
+                    UI.toast('✅ 配置已更新，数据已自动恢复');
+                } else {
+                    Logger.warn('[_loadSession] settingsBackup schema invalid, discarded');
+                    UI.toast('⚠️ 配置备份数据损坏，已进入最新数据');
+                    // 继续走下面的主数据加载逻辑
+                    const rawMainData2 = allData[CONFIG.KEYS.MAIN_DATA];
+                    if (rawMainData2 && typeof rawMainData2 === 'object' && rawMainData2.version) {
+                        // [S3-FIX] 浅拷贝后再 delete，不污染 _cachedAllData 中的对象引用
+                        const mainData2 = Object.assign({}, rawMainData2);
+                        delete mainData2.config;
+                        await DataModule.loadData(mainData2);
+                    }
+                }
+                return;
+            }
+
+            // 2. 加载主业务数据
+            const rawMainData = allData[CONFIG.KEYS.MAIN_DATA];
+            if (rawMainData && typeof rawMainData === 'object' && rawMainData.version) {
+                // [CRITICAL FIX] + [S3-FIX] 浅拷贝后再 delete config，
+                // 不污染 _cachedAllData 中的对象引用，防止缓存污染
+                const mainData = Object.assign({}, rawMainData);
+                if (mainData.config) delete mainData.config;
+
+                const loadOk = await DataModule.loadData(mainData);
+                // [Y20-FIX] loadData 返回 false 时给出明确提示，操作员不会面对空白不知原因
+                if (loadOk) {
+                    Logger.info('Session data loaded via electronAPI');
+                } else {
+                    Logger.error('[_loadSession] loadData returned false, schema may be corrupt');
+                    UI.toast('⚠️ 本班数据校验失败，已进入空白初始状态，请检查数据文件');
+                }
+            } else {
+                Logger.info('No valid session data, starting fresh');
+            }
+        } catch (e) {
+            Logger.error('Load session failed', e);
+            UI.toast('⚠️ 数据加载异常，已进入空白初始状态');
+        }
+    }
+
+}; 
+
+/* ==================== 28. 全局错误处理 ==================== */
+let _errorCount = 0;
+let _lastErrorTime = 0;
+
+window.addEventListener('error', (e) => {
+    const now = Date.now();
+    if (now - _lastErrorTime < 60000) { _errorCount++; } else { _errorCount = 1; }
+    _lastErrorTime = now;
+
+    // [U17-FIX] sessionStorage 在 reload 后清空，改用 localStorage 使崩溃计数跨 reload 存活
+    // 有人值守每天两班场景：启动后60s内连续崩溃>5次才触发停机屏，
+    // 正常使用中偶发错误不应打扰操作员，计数窗口仅限启动期
+    const _uptimeMs = typeof performance !== 'undefined' ? performance.now() : 0;
+    let crashCount = 0;
+    try {
+        // [FATAL-3 FIX] Windows GPO/企业安全策略可能禁用 localStorage，
+        // 在全局错误处理器内崩溃会导致整个错误捕获链失效，必须单独防护
+        crashCount = Number(localStorage.getItem('hf_crash_count')) || 0;
+        if (_uptimeMs < 60000) {
+            crashCount++;
+            localStorage.setItem('hf_crash_count', crashCount);
+        }
+    } catch (storageErr) {
+        console.warn('[ErrorHandler] localStorage unavailable:', storageErr);
+    }
+
+    try {
+        const allLogs  = (window.AppState && AppState.audit) ? AppState.audit.getAll() : [];
+        const tailLogs = allLogs.slice(-50);
+        const dump = {
+            ts: new Date().toISOString(),
+            error: { message: e.message, filename: e.filename, lineno: e.lineno, colno: e.colno, stack: e.error ? e.error.stack : 'N/A' },
+            meta: { userAgent: navigator.userAgent, resolution: `${window.screen.width}x${window.screen.height}`, uptime: typeof performance !== 'undefined' ? performance.now() : 0 },
+            errorCount: _errorCount, crashCount, logs: tailLogs
+        };
+        // [Electron Refactor] 崩溃转储写入内存 Logger，不使用 localStorage
+        if (window.AppState && AppState.audit) {
+            AppState.audit.push({ ts: dump.ts, lv: 'CRASH', msg: 'CrashDump', dt: dump });
+        }
+        // [S7-FIX] 崩溃转储必须合并到现有数据中写入，绝不能用单字段覆盖整个文件
+        try {
+            if (window.electronAPI && typeof window.electronAPI.saveData === 'function') {
+                // 同步读缓存（不发起新IO），拿到现有数据后合并写入
+                const base = Storage._cachedAllData || {};
+                window.electronAPI.saveData(Object.assign({}, base, { _crashDump: dump })).catch(() => {});
+            }
+        } catch (_) {}
+    } catch (dumpErr) {}
+
+    console.error('[Global Error]', { message: e.message, filename: e.filename, lineno: e.lineno, errorCount: _errorCount, crashCount });
+
+    if (crashCount > 5 && _uptimeMs < 60000) {  // 仅启动60s内连续崩溃才触发停机
+        try {
+            document.body.innerHTML = `
+                <div style="background:#1a202c;color:white;padding:40px;font-family:Arial,sans-serif;
+                     text-align:center;position:fixed;top:0;left:0;right:0;bottom:0;
+                     display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:99999;">
+                    <h1 style="font-size:42px;color:#fc8181;margin-bottom:20px;">⚠️ 系统异常停机</h1>
+                    <p style="font-size:20px;margin:10px 0;">检测到连续 ${crashCount} 次启动崩溃</p>
+                    <p style="font-size:16px;color:#a0aec0;margin:20px 0;">数据已安全保留，请联系技术人员检查日志后再处理。</p>
+                    <button onclick="try{localStorage.removeItem('hf_crash_count');}catch(_){}location.reload();" style="margin-top:20px;padding:12px 32px;font-size:18px;cursor:pointer;background:#e53e3e;color:white;border:2px solid #fc8181;border-radius:6px;font-weight:bold;"><!-- [Z2-FIX][MED-BUTTON FIX] localStorage失败不阻断reload -->
+                        🔄 强制重启（技术人员操作）
+                    </button>
+                    <p style="font-size:14px;color:#718096;">错误：${Util.escapeHTML(String(e.message || ''))} | ${Util.escapeHTML(String(e.filename || ''))}:${Util.escapeHTML(String(e.lineno || ''))}</p><!-- [U4-FIX] escapeHTML防止错误信息含<>破坏停机页 -->
+                </div>`;
+        } catch (ex) {}
+        return;
+    }
+
+        if (_errorCount >= 20) { // 有人值守场景，20次/分才报警，减少误报干扰操作
+        console.error('CRITICAL: Too many errors in 60s, system unstable');
+        try {
+            const errDiv = document.createElement('div');
+            errDiv.style.cssText = 'background:rgba(220,38,38,0.95);color:white;padding:40px;font-family:sans-serif;text-align:center;position:fixed;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:99999;';
+            errDiv.innerHTML = `
+                <h1 style="font-size:48px;margin-bottom:20px;">⚠️ 系统报警</h1>
+                <p style="font-size:24px;margin:10px 0;">检测到连续报错 (${_errorCount}次/分)，系统可能不稳定</p>
+                <p style="font-size:18px;margin:20px 0;opacity:0.8;">建议立即截图保留数据，然后手动刷新页面</p>
+                <div style="margin-top:20px;">
+                    <button onclick="this.parentElement.parentElement.remove()" style="padding:10px 20px;font-size:18px;cursor:pointer;background:white;color:#dc2626;border:none;border-radius:4px;font-weight:bold;">关闭警告，尝试继续操作</button>
+                    <button onclick="location.reload()" style="padding:10px 20px;font-size:18px;cursor:pointer;background:#7f1d1d;color:white;border:1px solid white;border-radius:4px;margin-left:15px;">立即刷新</button>
+                </div>`;
+            document.body.appendChild(errDiv);
+            
+            // 重置计数器，避免重复弹出
+            _errorCount = 0;
+        } catch (ex) {
+            console.error('Failed to show error screen', ex);
+        }
+        
+        // [SRE] 移除自动刷新逻辑
+        // setTimeout(() => location.reload(), 3000); 
+    }
+
+});
+
+window.addEventListener('unhandledrejection', (e) => {
+    const now = Date.now();
+    if (now - _lastErrorTime < 60000) { _errorCount++; } else { _errorCount = 1; }
+    _lastErrorTime = now;
+    console.error('[Unhandled Promise]', e.reason);
+    if (_errorCount >= 20) { // 有人值守场景，20次/分才报警，减少误报干扰操作
+        UI.toast('⚠️ 检测到多个异步错误，系统可能不稳定');
+    }
+});
+
+/* ==================== 紧急保存机制 [BLOCKER-2 FIX] ==================== */
+function _syncSnapshotForUnload() {
+    try {
+        if (!AppState || AppState.system.isHistoryMode) return;
+        if (!AppState.data.modified) return;
+        // [FATAL-UNLOAD FIX] 已移除 beforeunload 期间的异步 IPC 调用。
+        // 页面卸载时 C++ 上下文正在解绑，异步 IPC 可能触发 ACCESS_VIOLATION 崩溃。
+        // 主进程的 _isDirty 标志由 notifyDirtyState 在数据变脏时实时更新，已覆盖此功能。
+    } catch (e) {
+        console.error('[EmergencySnapshot] Failed:', e);
+    }
+}
+
+async function _asyncSaveOnHide() {
+    try {
+        if (!AppState || AppState.system.isHistoryMode) return;
+        if (!AppState.data.modified) return;
+        if (AppState.system.isSaving) return; // 正在保存中，不重复触发
+        // [R6-FIX] 设置保存锁，与 _performAutoSave 保持一致
+        AppState.system.isSaving = true;
+        try {
+            const data = DataModule.collectCurrentDataSync({ isEmergency: true });
+            if (!data) return;
+            // [FATAL-ASYNCSAVE FIX] 改为走 _enqueueWrite 串行队列，
+            // 消除与 Storage.set（_enqueueWrite）并发写盘的竞争，防止 JSON 文件被截断为 0 字节
+            await Storage._enqueueWrite(async () => {
+                const allData = await Storage._loadAllData();
+                const nextData = Object.assign({}, allData, { [CONFIG.KEYS.MAIN_DATA]: data });
+                const result = await window.electronAPI.saveData(nextData);
+                if (result && result.success) {
+                    Storage._cachedAllData = nextData;
+                    Storage._cacheTs = Date.now();
+                    AppState.data.modified = false;
+                    SaveIndicator.setSaved();
+                    Logger.info('[AsyncSave] Visibility-hide save succeeded');
+                } else {
+                    Logger.error('[AsyncSave] Visibility-hide save failed', result?.error);
+                }
+            });
+        } finally {
+            AppState.system.isSaving = false;
+        }
+    } catch (e) {
+        console.error('[AsyncSave] Failed:', e);
+        if (AppState) AppState.system.isSaving = false;
+    }
+}
+
+window.addEventListener('beforeunload', _syncSnapshotForUnload);
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        _asyncSaveOnHide(); // 异步，不阻塞，但此时进程仍存活所以 Promise 能完成
+    }
+});
+
+/* ==================== DOMContentLoaded 入口 ==================== */
+window.addEventListener('DOMContentLoaded', () => {
+
+    // [HIGH-DRAG FIX] 全局拦截文件拖拽导航：Electron 默认允许拖入文件并导航到 file://，
+    // 操作员不小心拖入文件会销毁整个应用上下文，未存盘数据蒸发。
+    document.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'none'; }, false);
+    document.addEventListener('drop', (e) => { e.preventDefault(); }, false);
+
+    // 全局焦点修复 + 模态框关闭防穿透
+    document.addEventListener('click', (e) => {
+        if (Modal._clickShielded) {
+            e.stopPropagation();
+            e.preventDefault();
+            return;
+        }
+        const target = e.target;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')) {
+            setTimeout(() => {
+                try { if (target && typeof target.focus === 'function') target.focus(); }
+                catch (e) { console.error('Focus failed', e); }
+            }, 10);
+        }
+    }, true);
+
+    document.addEventListener('focusout', () => {
+        setTimeout(() => { if (document.activeElement === document.body) document.body.blur(); }, 50);
+    });
+
+    App.init().then(() => {
+        AppActions._cleanupHistory().catch(e => console.warn('[Cleanup]', e));
+    }).catch(e => {
+        console.error('App init critical failure:', e);
+        const fatal = document.createElement('div');
+        fatal.style.cssText = [
+            'position:fixed', 'top:0', 'left:0', 'right:0', 'bottom:0',
+            'background:#1a202c', 'color:white', 'display:flex',
+            'flex-direction:column', 'justify-content:center', 'align-items:center',
+            'z-index:99999', 'font-family:Arial,sans-serif', 'text-align:center', 'padding:40px'
+        ].join(';');
+        fatal.innerHTML = `
+            <h1 style="font-size:32px;color:#fc8181;margin-bottom:20px;">❌ 系统初始化失败</h1>
+            <p style="font-size:18px;margin:10px 0;">${Util.escapeHTML(e.message)}</p>
+            <p style="font-size:14px;color:#a0aec0;margin:20px 0;">请检查控制台日志（Ctrl+Shift+I），或联系技术人员</p>
+        `;
+        document.body.appendChild(fatal);
+    });
+});
+</script>
+</body>
+</html>
